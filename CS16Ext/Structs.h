@@ -180,8 +180,8 @@ public:
 
 struct View
 {
-	Vector3 vUpward;
-	Vector3 vRight;
-	Vector3 vForward;
-	Vector3 vOrigin;
+        Vector3 vForward;
+        Vector3 vRight;
+        Vector3 vUpward;
+        Vector3 vOrigin;
 };
