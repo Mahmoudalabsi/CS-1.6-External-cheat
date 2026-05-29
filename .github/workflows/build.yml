@@ -5,37 +5,27 @@ on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: windows-latest
-
     steps:
       - uses: actions/checkout@v4
 
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
 
-      - name: Download Missing Headers
-        shell: pwsh
+      - name: Setup Environment and Build
+        shell: cmd
         run: |
-          # إنشاء مجلد للمكتبات الناقصة
-          mkdir DX9Headers
-          # تحميل الملفات الأساسية المفقودة
-          $files = @("d3dx9.h", "d3dx9math.h", "d3dx9core.h", "d3dx9tex.h", "d3d9.h", "d3d9types.h", "d3d9caps.h")
-          foreach ($file in $files) {
-            Write-Host "Downloading $file..."
-            Invoke-WebRequest -Uri "https://raw.githubusercontent.com/microsoft/directx-sdk-samples/master/Include/$file" -OutFile "DX9Headers/$file"
-          }
-
-      - name: Build Cheat
-        shell: pwsh
-        run: |
-          $sln = Get-ChildItem -Path . -Filter *.sln -Recurse | Select-Object -First 1
-          # إضافة مجلد الـ Headers الذي أنشأناه إلى مسار التضمين
-          $includePath = Join-Path $PWD "DX9Headers"
-          msbuild $sln.FullName /p:IncludePath="$includePath" /m
+          :: تحميل أدوات DirectX الأساسية المفقودة
+          mkdir DX9
+          curl -L https://github.com/microsoft/directx-sdk-samples/raw/master/Include/d3dx9.h -o DX9\d3dx9.h
+          curl -L https://github.com/microsoft/directx-sdk-samples/raw/master/Include/d3dx9math.h -o DX9\d3dx9math.h
+          
+          :: بناء المشروع مع توجيه المترجم للمكتبات التي أنشأناها
+          :: استخدام خاصية إضافية لإدراج مجلدات الـ Include الإضافية
+          msbuild CS16Ext.sln /p:Configuration=Release /p:Platform=x86 /p:IncludePath="%GITHUB_WORKSPACE%\DX9"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: CS16-Cheat-Binary
           path: |
-            **/*.exe
-            **/*.dll
+            **/Release/*.exe
