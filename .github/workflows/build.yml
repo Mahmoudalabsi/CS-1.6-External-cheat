@@ -12,28 +12,24 @@ jobs:
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
 
+      - name: Download and Setup DirectX SDK (Helper)
+        shell: pwsh
+        run: |
+          # سنقوم بتحميل ملفات الـ Header المطلوبة يدوياً للـ Build
+          # هذه الطريقة تتجاوز الحاجة لتثبيت الـ SDK الكامل
+          Invoke-WebRequest -Uri "https://github.com/microsoft/directx-sdk-samples/raw/master/Include/d3dx9.h" -OutFile "d3dx9.h"
+          # ملاحظة: إذا كان هناك ملفات d3dx9 أخرى مطلوبة (مثل d3dx9core.h)، ستحتاج لتحميلها بنفس الطريقة.
+
       - name: Build Cheat
         shell: pwsh
         run: |
-          # البحث عن ملف الـ sln في أي مكان داخل المستودع
           $sln = Get-ChildItem -Path . -Filter *.sln -Recurse | Select-Object -First 1
-          
-          if (-not $sln) {
-            Write-Error "لم يتم العثور على ملف .sln"
-            exit 1
-          }
-          
-          Write-Host "جاري بناء الملف: $($sln.FullName)"
-          
-          # البناء باستخدام الإعدادات الافتراضية للملف دون فرض Configuration أو Platform
-          # هذا يتجاوز خطأ MSB4126
-          msbuild $sln.FullName /m /verbosity:minimal
+          # سنقوم بإضافة المسار الحالي لمتغير Include ليتمكن المترجم من العثور على الملف
+          msbuild $sln.FullName /p:IncludePath="%GITHUB_WORKSPACE%"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: CS16-Cheat-Binary
-          # هذا المسار يبحث عن أي ملف exe تم إنتاجه في المجلدات الفرعية
           path: |
             **/*.exe
-            **/*.dll
