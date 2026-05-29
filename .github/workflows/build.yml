@@ -20,57 +20,51 @@ jobs:
     - name: Setup NuGet
       uses: NuGet/setup-nuget@v2
 
-    - name: Install DirectX D3DX SDK via NuGet
-      run: |
-        nuget install Microsoft.DXSDK.D3DX -OutputDirectory packages
+    - name: Install D3DX NuGet package
+      run: nuget install Microsoft.DXSDK.D3DX -OutputDirectory packages
 
-    - name: Set DXSDK_DIR environment variable
+    - name: Configure D3DX include and lib paths
       shell: pwsh
       run: |
-        $pkgDir = Get-ChildItem -Path "packages\Microsoft.DXSDK.D3DX.*" -Directory | Select-Object -First 1
-        $dxsdkDir = Join-Path $pkgDir.FullName "build\native"
-        # DXSDK_DIR must end with backslash because vcxproj uses $(DXSDK_DIR)Include (no separator)
-        $dxsdkDirWithSlash = $dxsdkDir + "\"
-        Write-Host "DXSDK_DIR = $dxsdkDirWithSlash"
+        $workspace = $env:GITHUB_WORKSPACE
+        $pkgPath = Join-Path $workspace "packages\Microsoft.DXSDK.D3DX.9.29.952.8\build\native"
 
-        # Verify paths
-        Write-Host "Include exists: $(Test-Path (Join-Path $dxsdkDir 'include'))"
-        Write-Host "d3dx9.h exists: $(Test-Path (Join-Path $dxsdkDir 'include\d3dx9.h'))"
-        Write-Host "Lib x86 exists: $(Test-Path (Join-Path $dxsdkDir 'lib\x86'))"
-        Write-Host "d3dx9.lib exists: $(Test-Path (Join-Path $dxsdkDir 'lib\x86\d3dx9.lib'))"
+        # Verify key files exist
+        $d3dx9h = Join-Path $pkgPath "include\d3dx9.h"
+        $d3dx9lib = Join-Path $pkgPath "release\lib\x86\d3dx9.lib"
+        $d3dx9dlib = Join-Path $pkgPath "debug\lib\x86\d3dx9d.lib"
+        Write-Host "d3dx9.h exists: $(Test-Path $d3dx9h)"
+        Write-Host "d3dx9.lib (release) exists: $(Test-Path $d3dx9lib)"
+        Write-Host "d3dx9d.lib (debug) exists: $(Test-Path $d3dx9dlib)"
 
-        # List lib directory contents
-        $libDir = Join-Path $dxsdkDir "lib"
-        if (Test-Path $libDir) {
-          Write-Host "Contents of lib directory:"
-          Get-ChildItem $libDir -Recurse | ForEach-Object { Write-Host "  $($_.FullName)" }
-        }
+        # Set DXSDK_DIR with trailing backslash
+        # The vcxproj uses $(DXSDK_DIR)Include which resolves to ...\build\native\Include
+        $dxsdkDir = $pkgPath + "\"
+        echo "DXSDK_DIR=$dxsdkDir" >> $env:GITHUB_ENV
+        Write-Host "DXSDK_DIR = $dxsdkDir"
 
-        echo "DXSDK_DIR=$dxsdkDirWithSlash" >> $env:GITHUB_ENV
+        # Create Directory.Build.targets to add the CORRECT lib paths
+        # The NuGet package structure is: build/native/{debug|release}/lib/{x86|x64}/
+        # But the vcxproj expects: $(DXSDK_DIR)/Lib/x86 which doesn't exist
+        # So we add both release and debug lib paths here
+        $targetsContent = @"
+<Project>
+  <ItemDefinitionGroup>
+    <Link>
+      <AdditionalLibraryDirectories>$pkgPath\release\lib\x86;$pkgPath\debug\lib\x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>
+"@
+        [System.IO.File]::WriteAllText("$workspace\Directory.Build.targets", $targetsContent)
+        Write-Host "Created Directory.Build.targets:"
+        Get-Content "$workspace\Directory.Build.targets"
 
     - name: Build Debug Win32
-      shell: pwsh
-      run: |
-        $pkgDir = Get-ChildItem -Path "packages\Microsoft.DXSDK.D3DX.*" -Directory | Select-Object -First 1
-        $dxsdkDir = Join-Path $pkgDir.FullName "build\native"
-        $includePath = Join-Path $dxsdkDir "include"
-        $libPath = Join-Path $dxsdkDir "lib\x86"
-
-        msbuild CS16Ext.sln /t:Build /p:Configuration=Debug /p:Platform="Win32" `
-          /p:AdditionalIncludeDirectories="$includePath;%(AdditionalIncludeDirectories)" `
-          /p:AdditionalLibraryPaths="$libPath;%(AdditionalLibraryPaths)"
+      run: msbuild CS16Ext.sln /t:Build /p:Configuration=Debug /p:Platform="Win32"
 
     - name: Build Release Win32
-      shell: pwsh
-      run: |
-        $pkgDir = Get-ChildItem -Path "packages\Microsoft.DXSDK.D3DX.*" -Directory | Select-Object -First 1
-        $dxsdkDir = Join-Path $pkgDir.FullName "build\native"
-        $includePath = Join-Path $dxsdkDir "include"
-        $libPath = Join-Path $dxsdkDir "lib\x86"
-
-        msbuild CS16Ext.sln /t:Build /p:Configuration=Release /p:Platform="Win32" `
-          /p:AdditionalIncludeDirectories="$includePath;%(AdditionalIncludeDirectories)" `
-          /p:AdditionalLibraryPaths="$libPath;%(AdditionalLibraryPaths)"
+      run: msbuild CS16Ext.sln /t:Build /p:Configuration=Release /p:Platform="Win32"
 
     - name: Upload Debug Build Artifact
       uses: actions/upload-artifact@v4
