@@ -24,7 +24,7 @@ namespace Offsets
     const DWORD PlayerTeam    = 0x100DF4;   // 1=CT, 2=T
     const DWORD OnLadder      = 0x136D8C;   // 1 on ladder, 0 on ground
     const DWORD InCross       = 0x125314;   // entity index under crosshair
-    const DWORD ViewMatrix    = 0x12EB30;   // 0x12EAF0 + 0x40 (pattern offset)
+    const DWORD ViewMatrix    = 0x12EB10;   // 0x12EAF0 + 0x40 (pattern offset)
     const DWORD Model         = 0x1204748;  // entity 1 model
     const DWORD Name          = 0x120471C;  // entity 1 name
     const DWORD dwForceJump   = 0x131434;   // force jump command
