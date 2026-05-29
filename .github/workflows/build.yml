@@ -23,42 +23,33 @@ jobs:
     - name: Install D3DX NuGet package
       run: nuget install Microsoft.DXSDK.D3DX -OutputDirectory packages
 
-    - name: Configure D3DX include and lib paths
+    - name: Configure D3DX paths
       shell: pwsh
       run: |
         $workspace = $env:GITHUB_WORKSPACE
-        $pkgPath = Join-Path $workspace "packages\Microsoft.DXSDK.D3DX.9.29.952.8\build\native"
+        $pkgPath = Join-Path $workspace 'packages\Microsoft.DXSDK.D3DX.9.29.952.8\build\native'
 
-        # Verify key files exist
-        $d3dx9h = Join-Path $pkgPath "include\d3dx9.h"
-        $d3dx9lib = Join-Path $pkgPath "release\lib\x86\d3dx9.lib"
-        $d3dx9dlib = Join-Path $pkgPath "debug\lib\x86\d3dx9d.lib"
-        Write-Host "d3dx9.h exists: $(Test-Path $d3dx9h)"
-        Write-Host "d3dx9.lib (release) exists: $(Test-Path $d3dx9lib)"
-        Write-Host "d3dx9d.lib (debug) exists: $(Test-Path $d3dx9dlib)"
+        Write-Host "d3dx9.h exists: $(Test-Path (Join-Path $pkgPath 'include\d3dx9.h'))"
+        Write-Host "d3dx9.lib exists: $(Test-Path (Join-Path $pkgPath 'release\lib\x86\d3dx9.lib'))"
 
-        # Set DXSDK_DIR with trailing backslash
-        # The vcxproj uses $(DXSDK_DIR)Include which resolves to ...\build\native\Include
-        $dxsdkDir = $pkgPath + "\"
-        echo "DXSDK_DIR=$dxsdkDir" >> $env:GITHUB_ENV
-        Write-Host "DXSDK_DIR = $dxsdkDir"
+        # Set DXSDK_DIR - vcxproj uses $(DXSDK_DIR)Include
+        echo "DXSDK_DIR=$pkgPath\" >> $env:GITHUB_ENV
+        Write-Host "DXSDK_DIR=$pkgPath\"
 
-        # Create Directory.Build.targets to add the CORRECT lib paths
-        # The NuGet package structure is: build/native/{debug|release}/lib/{x86|x64}/
-        # But the vcxproj expects: $(DXSDK_DIR)/Lib/x86 which doesn't exist
-        # So we add both release and debug lib paths here
-        $targetsContent = @"
-<Project>
-  <ItemDefinitionGroup>
-    <Link>
-      <AdditionalLibraryDirectories>$pkgPath\release\lib\x86;$pkgPath\debug\lib\x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-    </Link>
-  </ItemDefinitionGroup>
-</Project>
-"@
-        [System.IO.File]::WriteAllText("$workspace\Directory.Build.targets", $targetsContent)
-        Write-Host "Created Directory.Build.targets:"
-        Get-Content "$workspace\Directory.Build.targets"
+        # Create Directory.Build.targets to add correct lib paths
+        # The NuGet package puts libs in release\lib\x86 and debug\lib\x86
+        # But vcxproj expects $(DXSDK_DIR)/Lib/x86 which does not exist
+        $targetsPath = Join-Path $workspace 'Directory.Build.targets'
+        $xml = '<Project>'
+        $xml += '<ItemDefinitionGroup>'
+        $xml += '<Link>'
+        $xml += "<AdditionalLibraryDirectories>$pkgPath\release\lib\x86;$pkgPath\debug\lib\x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>"
+        $xml += '</Link>'
+        $xml += '</ItemDefinitionGroup>'
+        $xml += '</Project>'
+        Set-Content -Path $targetsPath -Value $xml
+        Write-Host 'Created Directory.Build.targets:'
+        Get-Content $targetsPath
 
     - name: Build Debug Win32
       run: msbuild CS16Ext.sln /t:Build /p:Configuration=Debug /p:Platform="Win32"
