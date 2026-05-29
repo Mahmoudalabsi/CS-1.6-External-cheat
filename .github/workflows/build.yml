@@ -17,12 +17,36 @@ jobs:
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
 
-    # إضافة خطوة لعرض تكوينات الحل المتاحة للتأكد من الأسماء الصحيحة
-    - name: List solution configurations
-      run: |
-        msbuild CS16Ext.sln /validate
+    - name: Setup NuGet
+      uses: NuGet/setup-nuget@v2
 
-    # محاولة البناء بدون تحديد Configuration أو Platform لاستخدام الافتراضي
-    - name: Build with MSBuild
+    - name: Install DirectX D3DX SDK via NuGet
+      run: |
+        nuget install Microsoft.DXSDK.D3DX -OutputDirectory packages
+
+    - name: Set DXSDK_DIR environment variable
+      run: |
+        $dxsdkPath = Get-ChildItem -Path "packages\Microsoft.DXSDK.D3DX.*\build\native" -Directory | Select-Object -First 1
+        echo "DXSDK_DIR=$($dxsdkPath.FullName)\" >> $env:GITHUB_ENV
+
+    - name: Build Debug Win32
       run: |
         msbuild CS16Ext.sln /t:Build /p:Configuration=Debug /p:Platform="Win32"
+
+    - name: Build Release Win32
+      run: |
+        msbuild CS16Ext.sln /t:Build /p:Configuration=Release /p:Platform="Win32"
+
+    - name: Upload Debug Build Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: CS16Ext-Debug-Win32
+        path: CS16Ext/Debug/CS16.exe
+        if-no-files-found: warn
+
+    - name: Upload Release Build Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: CS16Ext-Release-Win32
+        path: CS16Ext/Release/CS16.exe
+        if-no-files-found: warn
