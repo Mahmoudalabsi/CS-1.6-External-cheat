@@ -5,28 +5,28 @@ namespace Offsets
 {
     // ===== Updated for Exe build: 8684 (Aug 3 2020) =====
 
-    // Engine (hw.dll) offsets
-    const DWORD MoveType    = 0x100A0B8;  // NEW: 520=ground, 8=air, 24=water, 536=water+ground
-    const DWORD OnGround    = 0x122E2D4;  // UPDATED: was 0x122DF54
-    const DWORD IsChatting  = 0x64429C;   // NEW: 1 when chat is open
-    const DWORD InMenu      = 0x6C3AB0;   // UPDATED: was 0x135484
-    const DWORD Recoil      = 0x122E324;  // UPDATED: was 0x122DFA4
-    const DWORD EntityList  = 0x12043C8;  // NEW: entity list base
-    const DWORD fovscale1   = 0xEC9AA0;   // NOT UPDATED: may need verification
-    const DWORD fovscale2   = 0xEC9AB4;   // NOT UPDATED: may need verification
-    const DWORD WeaponID    = 0x108DA10;  // NOT UPDATED: may need verification
-    const DWORD AnimState   = 0x01204418; // NOT UPDATED: may need verification
-    const DWORD Posithion   = 0x01204420; // NOT UPDATED: may need verification
-    const DWORD dwMaxFps    = 0x149B14;   // NOT UPDATED: may need verification
+    // Engine (hw.dll) offsets — exact values from programmer
+    const DWORD MoveType    = 0x100A0B8;  // 520=ground, 8=air, 24=water, 536=water+ground
+    const DWORD OnGround    = 0x122E2D4;  // 1=On Ground, 0=in air
+    const DWORD IsChatting  = 0x64429C;   // 1 when chat is enabled
+    const DWORD InMenu      = 0x6C3AB0;   // 1 when in menu
+    const DWORD Recoil      = 0x122E324;  // recoil value
+    const DWORD EntityList  = 0x12043C8;  // entity list base (PlayerInfo struct base)
+    const DWORD fovscale1   = 0xEC9AA0;   // needs verification for build 8684
+    const DWORD fovscale2   = 0xEC9AB4;   // needs verification for build 8684
+    const DWORD WeaponID    = 0x108DA10;  // needs verification for build 8684
+    const DWORD AnimState   = 0x1204548;  // EntityList + 0x180 (anim_frame)
+    const DWORD Posithion   = 0x1204550;  // EntityList + 0x188 (position)
+    const DWORD dwMaxFps    = 0x149B14;   // needs verification for build 8684
 
-    // Client (client.dll) offsets
-    const DWORD PlayerTeam  = 0x100DE4;   // NOT UPDATED: may need verification
-    const DWORD OnLadder    = 0x136D8C;   // NEW: 1 on ladder, 0 on ground
-    const DWORD InCross     = 0x125314;   // NEW: entity index under crosshair
-    const DWORD ViewMatrix  = 0x12EAF0;   // UPDATED: was 0x12EAE0 (named "view")
-    const DWORD Model       = 0x012043C8; // NOT UPDATED: may need verification
-    const DWORD Name        = 0x0120439C; // NOT UPDATED: may need verification
-    const DWORD dwForceJump  = 0x131424;  // NOT UPDATED: may need verification
-    const DWORD dwForceDuck  = 0x1313A0;  // NOT UPDATED: may need verification
-    const DWORD dwForceAttack = 0x131360; // NOT UPDATED: may need verification
+    // Client (client.dll) offsets — exact values from programmer
+    const DWORD PlayerTeam  = 0x100DE4;   // needs verification for build 8684
+    const DWORD OnLadder    = 0x136D8C;   // 1 on ladder, 0 on ground
+    const DWORD InCross     = 0x125314;   // entity index under crosshair
+    const DWORD ViewMatrix  = 0x12EAF0;   // view matrix
+    const DWORD Model       = 0x12044F8;  // EntityList + 0x130 (model)
+    const DWORD Name        = 0x12044CC;  // EntityList + 0x104 (name)
+    const DWORD dwForceJump  = 0x131424;  // needs verification for build 8684
+    const DWORD dwForceDuck  = 0x1313A0;  // needs verification for build 8684
+    const DWORD dwForceAttack = 0x131360; // needs verification for build 8684
 }
