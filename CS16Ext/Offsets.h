@@ -13,7 +13,7 @@ namespace Offsets
     const DWORD Recoil      = 0x122E324;  // recoil value
     const DWORD EntityList  = 0x12043C8;  // entity list base (PlayerInfo struct base)
     const DWORD fovscale1   = 0xEC7AB0;  // updated for build 8684
-    const DWORD fovscale2   = 0xEC7AB0 + 0x14;  // = 0xEC7AC4
+    const DWORD fovscale2   = 0xEC7AC4;  // = 0xEC7AC4
     const DWORD WeaponID    = 0x108DA10;  // needs verification for build 8684
     const DWORD AnimState   = 0x1204548;  // EntityList + 0x180 (anim_frame)
     const DWORD Posithion   = 0x1204550;  // EntityList + 0x188 (position)
