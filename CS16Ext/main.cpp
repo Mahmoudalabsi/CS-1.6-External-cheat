@@ -112,8 +112,8 @@ void Hack()
 		InMenu = m->ReadMem<int>(m->eDll.base + Offsets::InMenu);
 		fovscale1 = m->ReadMem<float>(m->eDll.base + Offsets::fovscale1); //hw.dll+EC80E0
 		fovscale2 = m->ReadMem<float>(m->eDll.base + Offsets::fovscale2); //hw.dll+EC80F4
-		view = m->ReadMem<View>(m->cDll.base + Offsets::view);
-		recoil = m->ReadMem<float>(m->eDll.base + Offsets::recoil);
+		view = m->ReadMem<View>(m->cDll.base + Offsets::ViewMatrix);
+		recoil = m->ReadMem<float>(m->eDll.base + Offsets::Recoil);
 		WeaponID = m->ReadMem<int>(m->eDll.base + Offsets::WeaponID);
 
 		Aimbot::FOV = Weapons[WeaponID].FOV;
