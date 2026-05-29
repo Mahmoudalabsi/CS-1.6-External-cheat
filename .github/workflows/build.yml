@@ -1,31 +1,22 @@
 name: Build CS 1.6 Cheat
 
-on: [push, workflow_dispatch]
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: windows-latest
+
     steps:
-      - uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v2
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
 
-      - name: Setup Environment and Build
-        shell: cmd
-        run: |
-          :: تحميل أدوات DirectX الأساسية المفقودة
-          mkdir DX9
-          curl -L https://github.com/microsoft/directx-sdk-samples/raw/master/Include/d3dx9.h -o DX9\d3dx9.h
-          curl -L https://github.com/microsoft/directx-sdk-samples/raw/master/Include/d3dx9math.h -o DX9\d3dx9math.h
-          
-          :: بناء المشروع مع توجيه المترجم للمكتبات التي أنشأناها
-          :: استخدام خاصية إضافية لإدراج مجلدات الـ Include الإضافية
-          msbuild CS16Ext.sln /p:Configuration=Release /p:Platform=x86 /p:IncludePath="%GITHUB_WORKSPACE%\DX9"
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: CS16-Cheat-Binary
-          path: |
-            **/Release/*.exe
+    - name: Build with MSBuild
+      run: |
+        msbuild CS16Ext.sln /p:Configuration=Debug /p:Platform="x86" /t:Build
