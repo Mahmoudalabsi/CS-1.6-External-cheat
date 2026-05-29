@@ -13,19 +13,27 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Build Cheat
+        shell: pwsh
         run: |
-          # البحث عن أي ملف مشروع (sln) أو بناء مباشر
+          # البحث عن ملف الـ sln في أي مكان داخل المستودع
           $sln = Get-ChildItem -Path . -Filter *.sln -Recurse | Select-Object -First 1
-          if ($sln) {
-            msbuild $sln.FullName /p:Configuration=Release /p:Platform="x86"
-          } else {
-            # إذا لم يوجد ملف sln، نستخدم مترجم cl مباشرة للملفات الأساسية
-            cl /EHsc /O2 /Fe:CS16Cheat.exe *.cpp user32.lib
+          
+          if (-not $sln) {
+            Write-Error "لم يتم العثور على ملف .sln"
+            exit 1
           }
+          
+          Write-Host "جاري بناء الملف: $($sln.FullName)"
+          
+          # البناء باستخدام الإعدادات الافتراضية للملف دون فرض Configuration أو Platform
+          # هذا يتجاوز خطأ MSB4126
+          msbuild $sln.FullName /m /verbosity:minimal
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: CS16-Cheat-Binary
+          # هذا المسار يبحث عن أي ملف exe تم إنتاجه في المجلدات الفرعية
           path: |
             **/*.exe
+            **/*.dll
