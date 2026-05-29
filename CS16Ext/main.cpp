@@ -698,7 +698,14 @@ int main(int, char**)
 
 				ImGui::Text("  INTERIUM.OOO");
 				ImGui::Text(std::to_string(WeaponID).c_str());
-
+				// ===== DEBUG INFO =====
+				ImGui::Text("fovscale1: %.6f  (should be ~1.0)", fovscale1);
+				ImGui::Text("fovscale2: %.6f  (should be ~1.333)", fovscale2);
+				ImGui::Text("ViewOrigin: %.1f, %.1f, %.1f", view.vOrigin.x, view.vOrigin.y, view.vOrigin.z);
+				ImGui::Text("Recoil: %.4f", recoil);
+				ImGui::Text("InMenu: %d", InMenu);
+				ImGui::Text("PlayerTeam: %d", PlayerTeam);
+				// ===== END DEBUG =====
 				int BestTarget = -1;
 				double ClosestPos = 9999999;
 				float ScreenCenterX = Width / 2;
