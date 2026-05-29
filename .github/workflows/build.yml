@@ -32,13 +32,9 @@ jobs:
         Write-Host "d3dx9.h exists: $(Test-Path (Join-Path $pkgPath 'include\d3dx9.h'))"
         Write-Host "d3dx9.lib exists: $(Test-Path (Join-Path $pkgPath 'release\lib\x86\d3dx9.lib'))"
 
-        # Set DXSDK_DIR - vcxproj uses $(DXSDK_DIR)Include
         echo "DXSDK_DIR=$pkgPath\" >> $env:GITHUB_ENV
         Write-Host "DXSDK_DIR=$pkgPath\"
 
-        # Create Directory.Build.targets to add correct lib paths
-        # The NuGet package puts libs in release\lib\x86 and debug\lib\x86
-        # But vcxproj expects $(DXSDK_DIR)/Lib/x86 which does not exist
         $targetsPath = Join-Path $workspace 'Directory.Build.targets'
         $xml = '<Project>'
         $xml += '<ItemDefinitionGroup>'
@@ -51,22 +47,42 @@ jobs:
         Write-Host 'Created Directory.Build.targets:'
         Get-Content $targetsPath
 
-    - name: Build Debug Win32
-      run: msbuild CS16Ext.sln /t:Build /p:Configuration=Debug /p:Platform="Win32"
+    - name: Build Release Win32 (Static CRT)
+      run: msbuild CS16Ext.sln /t:Build /p:Configuration=Release /p:Platform="Win32" /p:RuntimeLibrary=MultiThreaded
 
-    - name: Build Release Win32
-      run: msbuild CS16Ext.sln /t:Build /p:Configuration=Release /p:Platform="Win32"
+    - name: Build Debug Win32 (Static CRT)
+      run: msbuild CS16Ext.sln /t:Build /p:Configuration=Debug /p:Platform="Win32" /p:RuntimeLibrary=MultiThreadedDebug
 
-    - name: Upload Debug Build Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: CS16Ext-Debug-Win32
-        path: CS16Ext/Debug/CS16.exe
-        if-no-files-found: warn
+    - name: Copy runtime DLLs
+      shell: pwsh
+      run: |
+        $workspace = $env:GITHUB_WORKSPACE
+        $pkgPath = Join-Path $workspace 'packages\Microsoft.DXSDK.D3DX.9.29.952.8\build\native'
 
-    - name: Upload Release Build Artifact
+        $releaseBin = Join-Path $pkgPath 'release\bin\x86'
+        $releaseOut = Join-Path $workspace 'CS16Ext\Release'
+        Copy-Item (Join-Path $releaseBin 'D3DX9_43.dll') $releaseOut -Force
+        Copy-Item (Join-Path $releaseBin 'D3DCompiler_43.dll') $releaseOut -Force
+        Write-Host 'Release output:'
+        Get-ChildItem $releaseOut
+
+        $debugBin = Join-Path $pkgPath 'debug\bin\x86'
+        $debugOut = Join-Path $workspace 'CS16Ext\Debug'
+        Copy-Item (Join-Path $debugBin 'D3dx9d_43.dll') $debugOut -Force
+        Copy-Item (Join-Path $debugBin 'D3DCompiler_43.dll') $debugOut -Force
+        Write-Host 'Debug output:'
+        Get-ChildItem $debugOut
+
+    - name: Upload Release Build
       uses: actions/upload-artifact@v4
       with:
         name: CS16Ext-Release-Win32
-        path: CS16Ext/Release/CS16.exe
+        path: CS16Ext/Release/
+        if-no-files-found: warn
+
+    - name: Upload Debug Build
+      uses: actions/upload-artifact@v4
+      with:
+        name: CS16Ext-Debug-Win32
+        path: CS16Ext/Debug/
         if-no-files-found: warn
