@@ -12,24 +12,24 @@ jobs:
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
 
-      - name: Download and Setup DirectX SDK (Helper)
-        shell: pwsh
-        run: |
-          # سنقوم بتحميل ملفات الـ Header المطلوبة يدوياً للـ Build
-          # هذه الطريقة تتجاوز الحاجة لتثبيت الـ SDK الكامل
-          Invoke-WebRequest -Uri "https://github.com/microsoft/directx-sdk-samples/raw/master/Include/d3dx9.h" -OutFile "d3dx9.h"
-          # ملاحظة: إذا كان هناك ملفات d3dx9 أخرى مطلوبة (مثل d3dx9core.h)، ستحتاج لتحميلها بنفس الطريقة.
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v2
+
+      - name: Install DirectX Dependencies
+        run: nuget install DirectXSDK -Version 9.29.1962 -OutputDirectory dependencies
 
       - name: Build Cheat
         shell: pwsh
         run: |
           $sln = Get-ChildItem -Path . -Filter *.sln -Recurse | Select-Object -First 1
-          # سنقوم بإضافة المسار الحالي لمتغير Include ليتمكن المترجم من العثور على الملف
-          msbuild $sln.FullName /p:IncludePath="%GITHUB_WORKSPACE%"
-
+          # نمرر مسار الـ include الخاص بالمكتبة التي حملناها للـ MSBuild
+          $includePath = (Get-ChildItem -Path dependencies -Filter Include -Recurse | Select-Object -First 1).FullName
+          msbuild $sln.FullName /p:IncludePath="$includePath" /m
+          
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: CS16-Cheat-Binary
           path: |
             **/*.exe
+            **/*.dll
