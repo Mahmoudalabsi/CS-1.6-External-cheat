@@ -2,9 +2,9 @@ name: Build CS 1.6 Cheat
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
   pull_request:
-    branches: [ main ]
+    branches: [ master ]
 
 jobs:
   build:
@@ -17,6 +17,12 @@ jobs:
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
 
+    # إضافة خطوة لعرض تكوينات الحل المتاحة للتأكد من الأسماء الصحيحة
+    - name: List solution configurations
+      run: |
+        msbuild CS16Ext.sln /validate
+
+    # محاولة البناء بدون تحديد Configuration أو Platform لاستخدام الافتراضي
     - name: Build with MSBuild
       run: |
-        msbuild CS16Ext.sln /p:Configuration=Debug /p:Platform="x86" /t:Build
+        msbuild CS16Ext.sln /t:Build /p:Configuration=Debug /p:Platform="Win32"
