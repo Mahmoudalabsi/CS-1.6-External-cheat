@@ -13,8 +13,8 @@ namespace Offsets
     const DWORD InMenu        = 0x6C3AB0;   // 1 when in menu
     const DWORD Recoil        = 0x122E324;  // recoil value
     const DWORD EntityList    = 0x12043C8;  // entity list base
-    const DWORD fovscale1     = 0xEC9E20;   // FOV scale X (~1.0)
-    const DWORD fovscale2     = 0xEC9E34;   // FOV scale Y (~1.333)
+    const DWORD fovscale1     = 0xEC9AA0;   // backup, not used by Evelion W2S
+    const DWORD fovscale2     = 0xEC9AB4;   // backup, not used by Evelion W2S
     const DWORD WeaponID      = 0x108DD90;  // current weapon ID
     const DWORD AnimState     = 0x1204798;  // entity 1 anim_frame
     const DWORD Posithion     = 0x12047A0;  // entity 1 position
