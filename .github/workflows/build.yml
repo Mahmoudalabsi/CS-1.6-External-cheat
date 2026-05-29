@@ -1,58 +1,31 @@
-name: Build CS 1.6 External Cheat
+name: Build CS 1.6 Cheat
 
-on:
-  push:
-    branches: [ master ]
-  workflow_dispatch:
+on: [push, workflow_dispatch]
 
 jobs:
   build:
     runs-on: windows-latest
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: List project files
-      run: |
-        echo "=== Looking for solution and project files ==="
-        dir /s /b *.sln
-        dir /s /b *.vcxproj
-        echo "=== Looking for source files ==="
-        dir /s /b *.cpp
-        dir /s /b *.h
-    
-    - name: Setup MSBuild
-      uses: microsoft/setup-msbuild@v1.3
-    
-    - name: Build with MSBuild
-      run: |
-        $sln = Get-ChildItem -Recurse -Filter *.sln | Select-Object -First 1
-        if ($sln) {
-          Write-Host "Building solution: $($sln.FullName)"
-          msbuild $sln.FullName /p:Configuration=Release /p:Platform=Win32 /m
-        } else {
-          Write-Host "No .sln found, trying .vcxproj"
-          $vcx = Get-ChildItem -Recurse -Filter *.vcxproj | Select-Object -First 1
-          msbuild $vcx.FullName /p:Configuration=Release /p:Platform=Win32 /m
-        }
-    
-    - name: Find and prepare artifact
-      run: |
-        echo "=== Searching for built .exe ==="
-        $exe = Get-ChildItem -Recurse -Filter *.exe | Where-Object { $_.DirectoryName -notlike "*node_modules*" }
-        if ($exe) {
-          $exe | ForEach-Object { Write-Host "Found: $($_.FullName)" }
-          New-Item -ItemType Directory -Path artifact -Force
-          $exe | Copy-Item -Destination artifact -Force
-        } else {
-          Write-Host "No .exe found, listing all output files..."
-          Get-ChildItem -Recurse -Include *.exe,*.dll,*.pdb | ForEach-Object { Write-Host $_.FullName }
-        }
-    
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: CS16-External-Cheat-Build
-        path: artifact/
-        retention-days: 30
+      - uses: actions/checkout@v4
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build Cheat
+        run: |
+          # البحث عن أي ملف مشروع (sln) أو بناء مباشر
+          $sln = Get-ChildItem -Path . -Filter *.sln -Recurse | Select-Object -First 1
+          if ($sln) {
+            msbuild $sln.FullName /p:Configuration=Release /p:Platform="x86"
+          } else {
+            # إذا لم يوجد ملف sln، نستخدم مترجم cl مباشرة للملفات الأساسية
+            cl /EHsc /O2 /Fe:CS16Cheat.exe *.cpp user32.lib
+          }
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CS16-Cheat-Binary
+          path: |
+            **/*.exe
