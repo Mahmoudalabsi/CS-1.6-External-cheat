@@ -12,20 +12,26 @@ jobs:
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
 
-      - name: Setup NuGet
-        uses: NuGet/setup-nuget@v2
-
-      - name: Install DirectX Dependencies
-        run: nuget install DirectXSDK -Version 9.29.1962 -OutputDirectory dependencies
+      - name: Download Missing Headers
+        shell: pwsh
+        run: |
+          # إنشاء مجلد للمكتبات الناقصة
+          mkdir DX9Headers
+          # تحميل الملفات الأساسية المفقودة
+          $files = @("d3dx9.h", "d3dx9math.h", "d3dx9core.h", "d3dx9tex.h", "d3d9.h", "d3d9types.h", "d3d9caps.h")
+          foreach ($file in $files) {
+            Write-Host "Downloading $file..."
+            Invoke-WebRequest -Uri "https://raw.githubusercontent.com/microsoft/directx-sdk-samples/master/Include/$file" -OutFile "DX9Headers/$file"
+          }
 
       - name: Build Cheat
         shell: pwsh
         run: |
           $sln = Get-ChildItem -Path . -Filter *.sln -Recurse | Select-Object -First 1
-          # نمرر مسار الـ include الخاص بالمكتبة التي حملناها للـ MSBuild
-          $includePath = (Get-ChildItem -Path dependencies -Filter Include -Recurse | Select-Object -First 1).FullName
+          # إضافة مجلد الـ Headers الذي أنشأناه إلى مسار التضمين
+          $includePath = Join-Path $PWD "DX9Headers"
           msbuild $sln.FullName /p:IncludePath="$includePath" /m
-          
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
