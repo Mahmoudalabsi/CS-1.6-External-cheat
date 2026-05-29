@@ -701,6 +701,9 @@ int main(int, char**)
 				// ===== DEBUG INFO =====
 				ImGui::Text("fovscale1: %.6f  (should be ~1.0)", fovscale1);
 				ImGui::Text("fovscale2: %.6f  (should be ~1.333)", fovscale2);
+				ImGui::Text("ViewForward: %.2f, %.2f, %.2f", view.vForward.x, view.vForward.y, view.vForward.z);
+				ImGui::Text("ViewRight: %.2f, %.2f, %.2f", view.vRight.x, view.vRight.y, view.vRight.z);
+				ImGui::Text("ViewUpward: %.2f, %.2f, %.2f", view.vUpward.x, view.vUpward.y, view.vUpward.z);
 				ImGui::Text("ViewOrigin: %.1f, %.1f, %.1f", view.vOrigin.x, view.vOrigin.y, view.vOrigin.z);
 				ImGui::Text("Recoil: %.4f", recoil);
 				ImGui::Text("InMenu: %d", InMenu);
