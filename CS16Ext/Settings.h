@@ -52,6 +52,13 @@ namespace MISC
 	bool AutoPistol = false;
 	bool FpsUnlock = false;
 }
+namespace TRIGGERBOT
+{
+	static bool Enabled = false;
+	static int Delay = 50;          // ms delay before shooting (humanize)
+	static int ShotDelay = 100;     // ms between shots (burst control)
+	static bool Deathmatch = true;  // shoot enemies only (ignore teammates)
+}
 namespace KEYS
 {
 	int AimbotKey1 = VK_LBUTTON;
@@ -59,4 +66,5 @@ namespace KEYS
 	int BhopKey = VK_SPACE;
 	int DDrunKey = VK_MENU;
 	int MenuKey = VK_INSERT;
+	int TriggerbotKey = 0x56;  // V key - hold to activate triggerbot
 }
