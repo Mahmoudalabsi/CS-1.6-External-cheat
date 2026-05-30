@@ -854,7 +854,7 @@ int main(int, char**)
                                         {
                                                 Vector3 Draw = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z));
                                                 // Aimbot targets upper body (chest): z - 40 = upper torso for bigger hitbox
-                                                Vector3 AimPos = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z - 40.f));
+                                                Vector3 AimPos = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z + 10.f));
                                                 TargetsWS.push_back(Vector3(AimPos.x, AimPos.y + abs(recoil) * Aimbot::RCS, 0));
                                                 if (Draw.x < 4) continue;
                                                 // Team ESP filter
@@ -881,12 +881,14 @@ int main(int, char**)
                                                 }
                                                 //if (drawdot) RenderRectFilled(ImVec2(Draw.x - 2, Draw.y - 2), ImVec2(Draw.x + 2, Draw.y + 2), ImVec4(1.f, 0.f, 0.f, 1.f), 0, 0);// FillRGB(Draw.x - 2, Draw.y - 2, 4, 4, 255, 0, 0, 155);
 
-                                                Vector3 Draw2 = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z - 72.f));
-                                                float boxH = Draw2.y - Draw.y;
+                                                // Entity origin is at WAIST. Head = z+36, Feet = z-36
+                                                Vector3 HeadPos = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z + 36.f));
+                                                Vector3 FeetPos = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z - 36.f));
+                                                float boxTop = HeadPos.y - 2;
+                                                float boxBot = FeetPos.y + 2;
+                                                float boxH = boxBot - boxTop;
                                                 float boxW = boxH / 2.0f;
-                                                float centerX = (Draw.x + Draw2.x) / 2.0f;
-                                                float boxTop = Draw.y - 2;
-                                                float boxBot = Draw2.y + 2;
+                                                float centerX = (HeadPos.x + FeetPos.x) / 2.0f;
                                                 float boxLeft = centerX - boxW / 2;
                                                 float boxRight = centerX + boxW / 2;
                                                 if (ESP::Box)
@@ -914,12 +916,12 @@ int main(int, char**)
                                                 float dist = Targets[i].DistTo(Targets[0]) * 0.254;
                                                 if (ESP::Dist)
                                                 {
-                                                        Vector3 Draw3 = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z - 78.f));
+                                                        Vector3 Draw3 = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z - 42.f));
                                                         RenderText(std::to_string((int)dist), ImVec2(Draw3.x, Draw3.y), 16.f, ImVec4(ESP::DistColor[0], ESP::DistColor[1], ESP::DistColor[2], ESP::DistColor[3]), true, fontEsp);
                                                 }
                                                 if (ESP::Names)
                                                 {
-                                                        Vector3 Draw4 = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z + 30.f));
+                                                        Vector3 Draw4 = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z + 42.f));
                                                         RenderText(TargetNames[i], ImVec2(Draw4.x, Draw4.y - 8), 16.f, ImVec4(ESP::NamesColor[0], ESP::NamesColor[1], ESP::NamesColor[2], ESP::NamesColor[3]), true, fontEsp);
                                                 }
 
