@@ -180,28 +180,49 @@ void Hack()
                                         }
                                         else
                                         {
-                                                int idx = InCrossID;
-                                                if (idx >= 0 && idx < (int)TargetModels.size())
-                                                {
-                                                        std::string mdl = TargetModels[idx];
-                                                        bool isCT = (mdl.find("urb") != std::string::npos ||
-                                                                mdl.find("gsg") != std::string::npos ||
-                                                                mdl.find("sas") != std::string::npos ||
-                                                                mdl.find("gig") != std::string::npos ||
-                                                                mdl.find("spe") != std::string::npos ||
-                                                                mdl.find("vip") != std::string::npos);
-                                                        bool isT = (mdl.find("ter") != std::string::npos ||
-                                                                mdl.find("arc") != std::string::npos ||
-                                                                mdl.find("gue") != std::string::npos ||
-                                                                mdl.find("lee") != std::string::npos ||
-                                                                mdl.find("mil") != std::string::npos);
-                                                        if (PlayerTeam == 1 && isCT) shouldShoot = true;  // We are T -> shoot CT
-                                                        if (PlayerTeam == 2 && isT) shouldShoot = true;   // We are CT -> shoot T
-                                                }
+                                                // Read target entity model DIRECTLY from memory (no vector, no race condition)
+                                                // InCrossID is 1-based entity index; Offsets::Model points to entity 1 data
+                                                // So entity N model is at: Offsets::Model + (N-1) * 592
+                                                char targetModelBuf[64] = {0};
+                                                m->Read(m->eDll.base + Offsets::Model + (InCrossID - 1) * 592, targetModelBuf, 64);
+                                                std::string targetMdl = targetModelBuf;
+
+                                                // Read local player model directly to determine our team
+                                                char localModelBuf[64] = {0};
+                                                m->Read(m->eDll.base + Offsets::Model, localModelBuf, 64);
+                                                std::string localMdl = localModelBuf;
+
+                                                bool localIsCT = (localMdl.find("urban") != std::string::npos ||
+                                                        localMdl.find("gsg9") != std::string::npos ||
+                                                        localMdl.find("sas") != std::string::npos ||
+                                                        localMdl.find("gign") != std::string::npos ||
+                                                        localMdl.find("spetsnaz") != std::string::npos ||
+                                                        localMdl.find("vip") != std::string::npos);
+                                                bool localIsT = (localMdl.find("terror") != std::string::npos ||
+                                                        localMdl.find("arctic") != std::string::npos ||
+                                                        localMdl.find("guerrilla") != std::string::npos ||
+                                                        localMdl.find("leet") != std::string::npos ||
+                                                        localMdl.find("militia") != std::string::npos);
+
+                                                bool targetIsCT = (targetMdl.find("urban") != std::string::npos ||
+                                                        targetMdl.find("gsg9") != std::string::npos ||
+                                                        targetMdl.find("sas") != std::string::npos ||
+                                                        targetMdl.find("gign") != std::string::npos ||
+                                                        targetMdl.find("spetsnaz") != std::string::npos ||
+                                                        targetMdl.find("vip") != std::string::npos);
+                                                bool targetIsT = (targetMdl.find("terror") != std::string::npos ||
+                                                        targetMdl.find("arctic") != std::string::npos ||
+                                                        targetMdl.find("guerrilla") != std::string::npos ||
+                                                        targetMdl.find("leet") != std::string::npos ||
+                                                        targetMdl.find("militia") != std::string::npos);
+
+                                                // Only shoot if target is on the ENEMY team
+                                                if ((localIsCT && targetIsT) || (localIsT && targetIsCT))
+                                                        shouldShoot = true;
                                         }
                                 }
 
-                                DWORD currentTime = GetTickCount();
+DWORD currentTime = GetTickCount();
                                 if (shouldShoot)
                                 {
                                         if (!triggerIsShooting)
