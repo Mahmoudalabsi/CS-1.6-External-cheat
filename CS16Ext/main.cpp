@@ -39,6 +39,33 @@ bool SetBhopKey = false;
 std::string BhopKeyLabel = "SPACE";
 bool SetDDrunKey = false;
 std::string DDrunKeyLabel = "ALT";
+// Helper: determine if entity is CT based on model name
+bool IsEntityCT(int entityIndex)
+{
+	if (entityIndex < 0 || entityIndex >= (int)TargetModels.size()) return false;
+	std::string mdl = TargetModels[entityIndex];
+	return (mdl.find("urban") != std::string::npos ||
+		mdl.find("gsg9") != std::string::npos ||
+		mdl.find("sas") != std::string::npos ||
+		mdl.find("gign") != std::string::npos);
+}
+// Helper: determine if entity is T based on model name
+bool IsEntityT(int entityIndex)
+{
+	if (entityIndex < 0 || entityIndex >= (int)TargetModels.size()) return false;
+	std::string mdl = TargetModels[entityIndex];
+	return (mdl.find("terror") != std::string::npos ||
+		mdl.find("arctic") != std::string::npos ||
+		mdl.find("guerrilla") != std::string::npos ||
+		mdl.find("leet") != std::string::npos);
+}
+// Helper: check if entity is a teammate of the local player
+bool IsTeammate(int entityIndex)
+{
+	if (PlayerTeam == 1 && IsEntityCT(entityIndex)) return true;  // We are CT, entity is CT
+	if (PlayerTeam == 2 && IsEntityT(entityIndex)) return true;   // We are T, entity is T
+	return false;
+}
 void InitCheat()
 {
 	std::string configDir = std::string(getenv("appdata")) + std::string("\\INTERIUM");
@@ -146,82 +173,29 @@ void Hack()
 				}
 				else m->WriteMem<int>(m->cDll.base + Offsets::dwForceAttack, 4);
 			}
-			// ===== TRIGGERBOT (Screen-Space Detection) =====
-			// No keyboard key needed - just toggle from menu
+			// ===== TRIGGERBOT (InCross Method) =====
+			// Activated via menu toggle only, no keyboard key needed
 			if (TRIGGERBOT::Enabled)
 			{
+				// Read InCross: entity index under crosshair (0 = nobody)
+				int InCrossID = m->ReadMem<int>(m->cDll.base + Offsets::InCross);
+
 				bool shouldShoot = false;
-				float ScreenCenterX = Width / 2.0f;
-				float ScreenCenterY = Height / 2.0f;
-				// Trigger FOV radius in pixels
-				float triggerRadiusX = TRIGGERBOT::FOV * (ScreenCenterX / 100.0f);
-				float triggerRadiusY = TRIGGERBOT::FOV * (ScreenCenterY / 100.0f);
 
-				for (int i = 0; i < 64; i++)
+				if (InCrossID > 0 && InCrossID < 33)
 				{
-					// Skip dead/invalid entities (anim > 200 = dead)
-					if (Anims[i] > 200) continue;
-					// Skip local player (entity 0 = world/local)
-					if (i == 0 && Anims[0] <= 0) continue;
-
-					// Convert entity feet position to screen
-					Vector3 screenFeet = W2S(Targets[i]);
-					if (screenFeet.x == 0 && screenFeet.y == 0) continue;
-
-					// Convert entity head position to screen (head = feet + 72 units up)
-					Vector3 headWorld = Targets[i];
-					headWorld.z += 72.f;
-					Vector3 screenHead = W2S(headWorld);
-					if (screenHead.x == 0 && screenHead.y == 0) continue;
-
-					// Calculate body center on screen (between head and feet)
-					float bodyCenterX = (screenFeet.x + screenHead.x) / 2.0f;
-					float bodyCenterY = (screenFeet.y + screenHead.y) / 2.0f;
-					float bodyHalfH = fabs(screenFeet.y - screenHead.y) / 2.0f;
-
-					// Check if crosshair is within the entity's body area on screen
-					float dx = fabs(bodyCenterX - ScreenCenterX);
-					float dy = fabs(bodyCenterY - ScreenCenterY);
-
-					if (dx <= triggerRadiusX && dy <= (bodyHalfH + triggerRadiusY))
+					// There is a player under the crosshair
+					if (TRIGGERBOT::Deathmatch)
 					{
-						// Team check using model names
-						bool isEnemy = false;
-						if (i < (int)TargetModels.size())
-						{
-							std::string model = TargetModels[i];
-							// CT models: urban, gsg9, sas, gign
-							bool isCT = (model.find("urban") != std::string::npos ||
-								model.find("gsg9") != std::string::npos ||
-								model.find("sas") != std::string::npos ||
-								model.find("gign") != std::string::npos);
-							// T models: terror, arctic, guerrilla, leet
-							bool isT = (model.find("terror") != std::string::npos ||
-								model.find("arctic") != std::string::npos ||
-								model.find("guerrilla") != std::string::npos ||
-								model.find("leet") != std::string::npos);
-
-							if (TRIGGERBOT::Deathmatch)
-							{
-								isEnemy = (isCT || isT); // Shoot anyone
-							}
-							else
-							{
-								// Shoot only the opposite team
-								if (PlayerTeam == 1) isEnemy = isT; // We are CT -> shoot T
-								else if (PlayerTeam == 2) isEnemy = isCT; // We are T -> shoot CT
-							}
-						}
-						else
-						{
-							continue;
-						}
-
-						if (isEnemy)
-						{
-							shouldShoot = true;
-							break;
-						}
+						// Deathmatch mode: shoot everyone
+						shouldShoot = true;
+					}
+					else
+					{
+						// Team mode: only shoot enemies
+						// Check if the entity under crosshair is a teammate
+						bool teammate = IsTeammate(InCrossID - 1); // InCrossID is 1-based, our arrays are 0-based
+						if (!teammate) shouldShoot = true;
 					}
 				}
 
@@ -535,12 +509,19 @@ int main(int, char**)
 					ImGui::PushItemWidth(120.f);
 					ImGui::Combo(("Type"), &ESP::BoxType, ("Classic\0Corner\0"));
 					ImGui::PopItemWidth();
-					ImGui::ColorEdit4(("Box color"), ESP::BoxColor, ImGuiColorEditFlags_NoInputs);
+					ImGui::ColorEdit4(("Enemy Box color"), ESP::BoxColor, ImGuiColorEditFlags_NoInputs);
 					ImGui::SliderFloat(("Box thickness"), &ESP::BoxWidth, 1.f, 10.f);
 					if(ESP::BoxType == 0) ImGui::SliderFloat(("Box rounding"), &ESP::BoxRounding, 0.f, 10.f);
+					ImGui::Separator();
+					ImGui::Checkbox(("Show Teammates"), &ESP::ShowTeam);
+					if (ESP::ShowTeam)
+					{
+						ImGui::ColorEdit4(("Team Box color"), ESP::TeamBoxColor, ImGuiColorEditFlags_NoInputs);
+					}
+					ImGui::Separator();
 					ImGui::Checkbox(("Draw distance"), &ESP::Dist);
 					ImGui::ColorEdit4(("Dist color"), ESP::DistColor, ImGuiColorEditFlags_NoInputs);
-					ImGui::Checkbox(("Draw names"), &ESP::Dist);
+					ImGui::Checkbox(("Draw names"), &ESP::Names);
 					ImGui::ColorEdit4(("Names color"), ESP::NamesColor, ImGuiColorEditFlags_NoInputs);
 					ImGui::Checkbox(("Crosshair"), &ESP::Crosshair);
 					ImGui::ColorEdit4(("Crosshair color"), ESP::CrosshairColor, ImGuiColorEditFlags_NoInputs);
@@ -559,11 +540,12 @@ int main(int, char**)
 				{
 					ImGui::Spacing(0, 5);
 					ImGui::Checkbox(("Triggerbot"), &TRIGGERBOT::Enabled); ImGui::SameLine(); ImGui::Checkbox(("Deathmatch"), &TRIGGERBOT::Deathmatch);
-					ImGui::SliderFloat(("Trigger FOV"), &TRIGGERBOT::FOV, 1.f, 30.f);
 					ImGui::SliderInt(("Delay (ms)"), &TRIGGERBOT::Delay, 0, 500);
 					ImGui::SliderInt(("Shot Delay (ms)"), &TRIGGERBOT::ShotDelay, 10, 500);
+					ImGui::Separator();
 					ImGui::TextWrapped("Toggle ON/OFF from menu. No key needed.");
-					ImGui::TextWrapped("Auto-shoots when crosshair is over an enemy.");
+					ImGui::TextWrapped("Uses InCross detection: auto-shoots");
+					ImGui::TextWrapped("when crosshair is over an enemy.");
 				}
 				else if (Page == 3)
 				{
@@ -723,6 +705,10 @@ int main(int, char**)
 					if (Draw.x == 0 && Draw.y == 0) continue;
 					float BoxHeight = fabs(Draw.y - DrawHead.y);
 					float BoxWidth = BoxHeight / 2.f;
+					// Team check - determine if this entity is a teammate
+					bool isTeammate = IsTeammate(i);
+					// Skip drawing ESP for teammates if ShowTeam is disabled
+					if (isTeammate && !ESP::ShowTeam) continue;
 					if (Draw.x >= ScreenCenterX - radiusx && Draw.x <= ScreenCenterX + radiusx &&
 						Draw.y >= ScreenCenterY - radiusy && Draw.y <= ScreenCenterY + radiusy)
 					{
@@ -739,20 +725,20 @@ int main(int, char**)
 					if (ESP::Box)
 					{
 						ImVec4 BoxCol;
-						bool isCT = false;
-						if (i < (int)TargetModels.size())
+						if (isTeammate)
 						{
-							std::string mdl = TargetModels[i];
-							isCT = (mdl.find("urban") != std::string::npos ||
-								mdl.find("gsg9") != std::string::npos ||
-								mdl.find("sas") != std::string::npos ||
-								mdl.find("gign") != std::string::npos);
+							// Teammate color (blue-ish, semi-transparent)
+							BoxCol = ImVec4(ESP::TeamBoxColor[0], ESP::TeamBoxColor[1], ESP::TeamBoxColor[2], ESP::TeamBoxColor[3]);
 						}
-						if (isCT)
-							BoxCol = ImVec4(0.3f, 0.5f, 1.f, ESP::BoxColor[3]);
 						else
-							BoxCol = ImVec4(1.f, 0.5f, 0.3f, ESP::BoxColor[3]);
-
+						{
+							// Enemy color: CT = blue, T = orange (original behavior)
+							bool isCT = IsEntityCT(i);
+							if (isCT)
+								BoxCol = ImVec4(0.3f, 0.5f, 1.f, ESP::BoxColor[3]);
+							else
+								BoxCol = ImVec4(1.f, 0.5f, 0.3f, ESP::BoxColor[3]);
+						}
 						float bx = Draw.x - BoxWidth / 2.f;
 						float by = DrawHead.y;
 						if (ESP::BoxType == 0)
