@@ -56,7 +56,6 @@ void InitCheat()
         CreateDirectory(configDir.c_str(), 0);
 
         Sleep(100);
-        //      LoadConfig("KleskBY.ini");
         m = new MemoryManager;
         DWORD PID = 0;
         DWORD client = getModuleAddress(PID, "client.dll");
@@ -76,7 +75,7 @@ static LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 }
                 return 0;
         case WM_SYSCOMMAND:
-                if ((wParam & 0xfff0) == SC_KEYMENU) return 0; // Disable ALT application menu
+                if ((wParam & 0xfff0) == SC_KEYMENU) return 0;
                 break;
         case WM_DESTROY:
                 PostQuitMessage(0);
@@ -99,7 +98,7 @@ bool ScreenTransform(Vector3 vPoint, float* vScreen)
         float invW = 1.0f / w;
         vScreen[0] *= invW;
         vScreen[1] *= invW;
-        return (0.0f >= invW);   // true = behind camera
+        return (0.0f >= invW);
 }
 
 Vector3 W2S(Vector3 WorldPos)
@@ -122,7 +121,7 @@ void Hack()
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 PlayerTeam = m->ReadMem<int>(m->cDll.base + Offsets::PlayerTeam);
                 InMenu = m->ReadMem<int>(m->eDll.base + Offsets::InMenu);
-                m->Read(m->eDll.base + Offsets::ViewMatrix, gWorldToScreen, sizeof(gWorldToScreen));  // 4x4 matrix (Evelion method)
+                m->Read(m->eDll.base + Offsets::ViewMatrix, gWorldToScreen, sizeof(gWorldToScreen));
                 recoil = m->ReadMem<float>(m->eDll.base + Offsets::Recoil);
                 WeaponID = m->ReadMem<int>(m->eDll.base + Offsets::WeaponID);
 
@@ -136,7 +135,7 @@ void Hack()
                 {
                         float AnimState = m->ReadMem<float>(m->eDll.base + Offsets::AnimState + i * 592);
                         Anims.push_back(AnimState);
-                        Vector3 Posithion = m->ReadMem<Vector3>(m->eDll.base + Offsets::Posithion + i * 592); // 0x04A42A60
+                        Vector3 Posithion = m->ReadMem<Vector3>(m->eDll.base + Offsets::Posithion + i * 592);
                         Targets.push_back(Posithion);
                 }
 
@@ -147,8 +146,6 @@ void Hack()
                                 int OnGround = m->ReadMem<int>(m->eDll.base + Offsets::OnGround);
                                 if (OnGround == 1)
                                 {
-                                        //m->WriteMem<int>(m->cDll.base + Offsets::dwForceJump, 4);
-                                        //std::this_thread::sleep_for(std::chrono::milliseconds(5));
                                         m->WriteMem<int>(m->cDll.base + Offsets::dwForceJump, 5);
                                         std::this_thread::sleep_for(std::chrono::milliseconds(5));
                                         m->WriteMem<int>(m->cDll.base + Offsets::dwForceJump, 4);
@@ -175,18 +172,15 @@ void Hack()
 
                                 if (crosshairEntity > 0 && crosshairEntity < (int)TargetModels.size())
                                 {
-                                        // Check if entity is enemy (when Deathmatch mode is off)
                                         bool isEnemy = true;
                                         if (!TRIGGERBOT::Deathmatch)
                                         {
                                                 int entityTeam = 0;
-                                                // Determine team from model name
                                                 std::string modelname = TargetModels[crosshairEntity];
                                                 if (modelname == "arc" || modelname == "gue" || modelname == "lee" || modelname == "ter")
-                                                        entityTeam = 1; // Terrorist
+                                                        entityTeam = 1;
                                                 else
-                                                        entityTeam = 2; // CT
-
+                                                        entityTeam = 2;
                                                 if (entityTeam == PlayerTeam)
                                                         isEnemy = false;
                                         }
@@ -194,8 +188,6 @@ void Hack()
                                         if (isEnemy)
                                         {
                                                 DWORD currentTime = GetTickCount();
-
-                                                // Apply delay before shooting (humanize reaction time)
                                                 if (!triggerIsShooting)
                                                 {
                                                         if (currentTime - triggerLastShotTime >= (DWORD)TRIGGERBOT::Delay)
@@ -207,7 +199,6 @@ void Hack()
                                                 }
                                                 else
                                                 {
-                                                        // Release attack and wait shot delay
                                                         if (currentTime - triggerLastShotTime >= 10)
                                                         {
                                                                 m->WriteMem<int>(m->cDll.base + Offsets::dwForceAttack, 4);
@@ -218,7 +209,6 @@ void Hack()
                                         }
                                         else
                                         {
-                                                // Not enemy - make sure attack is released
                                                 if (triggerIsShooting)
                                                 {
                                                         m->WriteMem<int>(m->cDll.base + Offsets::dwForceAttack, 4);
@@ -228,7 +218,6 @@ void Hack()
                                 }
                                 else
                                 {
-                                        // No entity in crosshair - release attack
                                         if (triggerIsShooting)
                                         {
                                                 m->WriteMem<int>(m->cDll.base + Offsets::dwForceAttack, 4);
@@ -238,7 +227,6 @@ void Hack()
                         }
                         else
                         {
-                                // Triggerbot not active - release attack if we were shooting
                                 if (triggerIsShooting)
                                 {
                                         m->WriteMem<int>(m->cDll.base + Offsets::dwForceAttack, 4);
@@ -456,7 +444,6 @@ int main(int, char**)
         ImGui_ImplWin32_Init(g_hwnd);
         ImGui_ImplDX9_Init(g_pd3dDevice);
 
-        // Main loop
         MSG msg;
         ZeroMemory(&msg, sizeof(msg));
 
@@ -593,10 +580,7 @@ int main(int, char**)
                                         ImGui::SliderInt(("Delay (ms)"), &TRIGGERBOT::Delay, 0, 500);
                                         ImGui::SliderInt(("Shot Delay (ms)"), &TRIGGERBOT::ShotDelay, 10, 500);
                                         ImGui::TextWrapped("Hold the triggerbot key to activate.");
-                                        ImGui::TextWrapped("When an enemy is in your crosshair,");
-                                        ImGui::TextWrapped("the cheat will automatically shoot.");
-                                        ImGui::TextWrapped("Delay adds human-like reaction time.");
-                                        ImGui::TextWrapped("Shot Delay controls time between shots.");
+                                        ImGui::TextWrapped("When an enemy is in your crosshair, it auto-shoots.");
                                 }
                                 else if (Page == 3)
                                 {
@@ -613,10 +597,7 @@ int main(int, char**)
 
                                                 if (ImGui::Selectable(configname.c_str(), &IsConfigSelected[i]))
                                                 {
-                                                        for (int j = 0; j < 50; j++)
-                                                        {
-                                                                IsConfigSelected[j] = false;
-                                                        }
+                                                        for (int j = 0; j < 50; j++) IsConfigSelected[j] = false;
                                                         IsConfigSelected[i] = true;
                                                 }
                                         }
@@ -626,15 +607,8 @@ int main(int, char**)
                                         if (ImGui::Button(("SAVE"), ImVec2(225, 25)))
                                         {
                                                 for (int j = 0; j < 50; j++)
-                                                {
-                                                        if (IsConfigSelected[j])
-                                                        {
-                                                                SaveConfig(SettingsList[j]);
-                                                        }
-                                                }
-                                                Beep(300, 100);
-                                                Sleep(30);
-                                                Beep(300, 100);
+                                                        if (IsConfigSelected[j]) SaveConfig(SettingsList[j]);
+                                                Beep(300, 100); Sleep(30); Beep(300, 100);
                                         }
 
                                         ImGui::PushItemWidth(225);
@@ -648,24 +622,15 @@ int main(int, char**)
                                                         if (IsConfigSelected[j])
                                                         {
                                                                 LoadConfig(SettingsList[j]);
-
-                                                                if (Keys[KEYS::MenuKey] != NULL) MenuKeyLabel = Keys[KEYS::MenuKey];
-                                                                else  MenuKeyLabel = ("unknown");
-                                                                if (Keys[KEYS::AimbotKey1] != NULL) AimbotKeyLabel = Keys[KEYS::AimbotKey1];
-                                                                else  AimbotKeyLabel = ("unknown");
-                                                                if (Keys[KEYS::AimbotKey2] != NULL) Aimbot2KeyLabel = Keys[KEYS::AimbotKey2];
-                                                                else  Aimbot2KeyLabel = ("unknown");
-                                                                if (Keys[KEYS::BhopKey] != NULL) BhopKeyLabel = Keys[KEYS::BhopKey];
-                                                                else  BhopKeyLabel = ("unknown");
-                                                                if (Keys[KEYS::DDrunKey] != NULL) DDrunKeyLabel = Keys[KEYS::DDrunKey];
-                                                                else  DDrunKeyLabel = ("unknown");
-                                                                if (Keys[KEYS::TriggerbotKey] != NULL) TriggerbotKeyLabel = Keys[KEYS::TriggerbotKey];
-                                                                else  TriggerbotKeyLabel = ("unknown");
+                                                                if (Keys[KEYS::MenuKey] != NULL) MenuKeyLabel = Keys[KEYS::MenuKey]; else MenuKeyLabel = ("unknown");
+                                                                if (Keys[KEYS::AimbotKey1] != NULL) AimbotKeyLabel = Keys[KEYS::AimbotKey1]; else AimbotKeyLabel = ("unknown");
+                                                                if (Keys[KEYS::AimbotKey2] != NULL) Aimbot2KeyLabel = Keys[KEYS::AimbotKey2]; else Aimbot2KeyLabel = ("unknown");
+                                                                if (Keys[KEYS::BhopKey] != NULL) BhopKeyLabel = Keys[KEYS::BhopKey]; else BhopKeyLabel = ("unknown");
+                                                                if (Keys[KEYS::DDrunKey] != NULL) DDrunKeyLabel = Keys[KEYS::DDrunKey]; else DDrunKeyLabel = ("unknown");
+                                                                if (Keys[KEYS::TriggerbotKey] != NULL) TriggerbotKeyLabel = Keys[KEYS::TriggerbotKey]; else TriggerbotKeyLabel = ("unknown");
                                                         }
                                                 }
-                                                Beep(300, 100);
-                                                Sleep(30);
-                                                Beep(300, 100);
+                                                Beep(300, 100); Sleep(30); Beep(300, 100);
                                         }
 
                                         ImGui::SameLine();
@@ -681,17 +646,7 @@ int main(int, char**)
                                         if (ImGui::Button(("DELETE"), ImVec2(225, 25)))
                                         {
                                                 for (int j = 0; j < 50; j++)
-                                                {
-                                                        if (IsConfigSelected[j])
-                                                        {
-                                                                if (remove(SettingsList[j].c_str()))
-                                                                {
-                                                                        Beep(300, 100);
-                                                                        Sleep(30);
-                                                                        Beep(300, 100);
-                                                                }
-                                                        }
-                                                }
+                                                        if (IsConfigSelected[j]) remove(SettingsList[j].c_str());
                                         }
 
                                         ImGui::SameLine();
@@ -700,105 +655,37 @@ int main(int, char**)
                                                 std::string agagag = std::string(getenv("appdata")) + std::string(("\\INTERIUM\\CS16Ext\\"));
                                                 ShellExecute(NULL, "open", agagag.c_str(), NULL, NULL, SW_SHOWNORMAL);
                                         }
-
                                 }
                                 else if (Page == 4)
                                 {
                                         ImGui::Spacing(0, 5);
                                         if (ImGui::Button((MenuKeyLabel + "##MenuKeyLabel").c_str(), ImVec2(200, 25))) SetMenuKey = true;
-                                        while (SetMenuKey)
-                                        {
-                                                for (int i = 0; i < 256; i++)
-                                                {
-                                                        if (GetAsyncKeyState(i) & 0x8000)
-                                                        {
-                                                                KEYS::MenuKey = i;
-                                                                MenuKeyLabel = Keys[i];
-                                                                SetMenuKey = false;
-                                                                std::this_thread::sleep_for(std::chrono::milliseconds(300));
-                                                        }
-                                                }
-                                        }
+                                        while (SetMenuKey) { for (int i = 0; i < 256; i++) { if (GetAsyncKeyState(i) & 0x8000) { KEYS::MenuKey = i; MenuKeyLabel = Keys[i]; SetMenuKey = false; std::this_thread::sleep_for(std::chrono::milliseconds(300)); } } }
                                         ImGui::SameLine();  ImGui::Text("Menu key");
 
                                         ImGui::Spacing(0, 5);
                                         if (ImGui::Button((AimbotKeyLabel + "##AimbotKeyLabel").c_str(), ImVec2(200, 25))) SetAimbotKey = true;
-                                        while (SetAimbotKey)
-                                        {
-                                                for (int i = 0; i < 256; i++)
-                                                {
-                                                        if (GetAsyncKeyState(i) & 0x8000)
-                                                        {
-                                                                KEYS::AimbotKey1 = i;
-                                                                AimbotKeyLabel = Keys[i];
-                                                                SetAimbotKey = false;
-                                                        }
-                                                }
-                                        }
+                                        while (SetAimbotKey) { for (int i = 0; i < 256; i++) { if (GetAsyncKeyState(i) & 0x8000) { KEYS::AimbotKey1 = i; AimbotKeyLabel = Keys[i]; SetAimbotKey = false; } } }
                                         ImGui::SameLine();  ImGui::Text("Aimbot key");
 
                                         ImGui::Spacing(0, 5);
                                         if (ImGui::Button((Aimbot2KeyLabel + "##Aimbot2KeyLabel").c_str(), ImVec2(200, 25))) SetAimbot2Key = true;
-                                        while (SetAimbot2Key)
-                                        {
-                                                for (int i = 0; i < 256; i++)
-                                                {
-                                                        if (GetAsyncKeyState(i) & 0x8000)
-                                                        {
-                                                                KEYS::AimbotKey2 = i;
-                                                                Aimbot2KeyLabel = Keys[i];
-                                                                SetAimbot2Key = false;
-                                                        }
-                                                }
-                                        }
+                                        while (SetAimbot2Key) { for (int i = 0; i < 256; i++) { if (GetAsyncKeyState(i) & 0x8000) { KEYS::AimbotKey2 = i; Aimbot2KeyLabel = Keys[i]; SetAimbot2Key = false; } } }
                                         ImGui::SameLine();  ImGui::Text("Aimbot2 key");
 
                                         ImGui::Spacing(0, 5);
                                         if (ImGui::Button((TriggerbotKeyLabel + "##TriggerbotKeyLabel").c_str(), ImVec2(200, 25))) SetTriggerbotKey = true;
-                                        while (SetTriggerbotKey)
-                                        {
-                                                for (int i = 0; i < 256; i++)
-                                                {
-                                                        if (GetAsyncKeyState(i) & 0x8000)
-                                                        {
-                                                                KEYS::TriggerbotKey = i;
-                                                                TriggerbotKeyLabel = Keys[i];
-                                                                SetTriggerbotKey = false;
-                                                        }
-                                                }
-                                        }
+                                        while (SetTriggerbotKey) { for (int i = 0; i < 256; i++) { if (GetAsyncKeyState(i) & 0x8000) { KEYS::TriggerbotKey = i; TriggerbotKeyLabel = Keys[i]; SetTriggerbotKey = false; } } }
                                         ImGui::SameLine();  ImGui::Text("Triggerbot key");
 
                                         ImGui::Spacing(0, 5);
                                         if (ImGui::Button((BhopKeyLabel + "##BhopKeyLabel").c_str(), ImVec2(200, 25))) SetBhopKey = true;
-                                        while (SetBhopKey)
-                                        {
-                                                for (int i = 0; i < 256; i++)
-                                                {
-                                                        if (GetAsyncKeyState(i) & 0x8000)
-                                                        {
-                                                                KEYS::BhopKey = i;
-                                                                BhopKeyLabel = Keys[i];
-                                                                SetBhopKey = false;
-                                                        }
-                                                }
-                                        }
+                                        while (SetBhopKey) { for (int i = 0; i < 256; i++) { if (GetAsyncKeyState(i) & 0x8000) { KEYS::BhopKey = i; BhopKeyLabel = Keys[i]; SetBhopKey = false; } } }
                                         ImGui::SameLine();  ImGui::Text("Bhop key");
 
                                         ImGui::Spacing(0, 5);
                                         if (ImGui::Button((DDrunKeyLabel + "##DDrunKeyLabel").c_str(), ImVec2(200, 25))) SetDDrunKey = true;
-                                        while (SetDDrunKey)
-                                        {
-                                                for (int i = 0; i < 256; i++)
-                                                {
-                                                        if (GetAsyncKeyState(i) & 0x8000)
-                                                        {
-                                                                KEYS::DDrunKey = i;
-                                                                DDrunKeyLabel = Keys[i];
-                                                                SetDDrunKey = false;
-                                                        }
-                                                }
-                                        }
+                                        while (SetDDrunKey) { for (int i = 0; i < 256; i++) { if (GetAsyncKeyState(i) & 0x8000) { KEYS::DDrunKey = i; DDrunKeyLabel = Keys[i]; SetDDrunKey = false; } } }
                                         ImGui::SameLine();  ImGui::Text("DDrun key");
                                 }
                                 ImGui::Columns();
@@ -818,12 +705,11 @@ int main(int, char**)
 
                                 ImGui::Text("  INTERIUM.OOO");
                                 ImGui::Text(std::to_string(WeaponID).c_str());
-                                // ===== DEBUG INFO =====
                                 ImGui::Text("Recoil: %.4f", recoil);
                                 ImGui::Text("InMenu: %d  Team: %d", InMenu, PlayerTeam);
                                 int dbgInCross = m->ReadMem<int>(m->eDll.base + Offsets::InCross);
                                 ImGui::Text("InCross: %d", dbgInCross);
-                                // ===== END DEBUG =====
+
                                 int BestTarget = -1;
                                 double ClosestPos = 9999999;
                                 float ScreenCenterX = Width / 2;
@@ -847,7 +733,6 @@ int main(int, char**)
                                 TargetsWS.clear();
                                 for (int i = 0; i < Targets.size(); i++)
                                 {
-
                                         if (Anims[i] == OldAnims[i] && Anims[i] == OldOldAnims[i]) TargetsWS.push_back(Vector3(0, 0, 0));
                                         else if(Targets[i].x != 0)
                                         {
@@ -858,13 +743,9 @@ int main(int, char**)
                                                 {
                                                         int HisTeam = 2;
                                                         std::string modelname = TargetModels[i];
-                                                        if (modelname == "arc" || modelname == "gue" || modelname == "lee" || modelname == "ter")
-                                                        {
-                                                                HisTeam = 1;
-                                                        }
+                                                        if (modelname == "arc" || modelname == "gue" || modelname == "lee" || modelname == "ter") HisTeam = 1;
                                                         if (HisTeam == PlayerTeam) continue;
                                                 }
-                                                //if (drawdot) RenderRectFilled(ImVec2(Draw.x - 2, Draw.y - 2), ImVec2(Draw.x + 2, Draw.y + 2), ImVec4(1.f, 0.f, 0.f, 1.f), 0, 0);
 
                                                 Vector3 Draw2 = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z - 50.f));
                                                 int boxheight = (Draw2.y - Draw.y) * 1.25;
