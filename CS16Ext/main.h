@@ -27,7 +27,7 @@ static int Height = 480;
 static bool open = true;
 static bool ShowMenu = true;
 
-static MARGINS MARGIN = { -1, -1, -1, -1 };
+static MARGINS MARGIN = { 0, 0, Width, Height };
 
 using namespace std;
 
