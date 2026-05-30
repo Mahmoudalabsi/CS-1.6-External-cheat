@@ -112,6 +112,13 @@ void SaveConfig(std::string ConfigName)
 	ofs << "AutoPistol = " << MISC::AutoPistol << "\n";
 	ofs << "FpsUnlock = " << MISC::FpsUnlock << "\n";
 
+	ofs << "[TRIGGERBOT]\n";
+
+	ofs << "Enabled = " << TRIGGERBOT::Enabled << "\n";
+	ofs << "Delay = " << TRIGGERBOT::Delay << "\n";
+	ofs << "ShotDelay = " << TRIGGERBOT::ShotDelay << "\n";
+	ofs << "Deathmatch = " << TRIGGERBOT::Deathmatch << "\n";
+
 	ofs << "[KEYS]\n";
 
 	ofs << "AimbotKey1 = " << KEYS::AimbotKey1 << "\n";
@@ -119,6 +126,7 @@ void SaveConfig(std::string ConfigName)
 	ofs << "BhopKey = " << KEYS::BhopKey << "\n";
 	ofs << "DDrunKey = " << KEYS::DDrunKey << "\n";
 	ofs << "MenuKey = " << KEYS::MenuKey << "\n";
+	ofs << "TriggerbotKey = " << KEYS::TriggerbotKey << "\n";
 
 	ofs.close();
 }
@@ -182,16 +190,19 @@ bool LoadConfig(std::string ConfigName)
 			MISC::AutoPistol = reader.GetBoolean("MISC", "AutoPistol", false);
 			MISC::FpsUnlock = reader.GetBoolean("MISC", "FpsUnlock", false);
 
+			TRIGGERBOT::Enabled = reader.GetBoolean("TRIGGERBOT", "Enabled", false);
+			TRIGGERBOT::Delay = reader.GetInteger("TRIGGERBOT", "Delay", 50);
+			TRIGGERBOT::ShotDelay = reader.GetInteger("TRIGGERBOT", "ShotDelay", 100);
+			TRIGGERBOT::Deathmatch = reader.GetBoolean("TRIGGERBOT", "Deathmatch", true);
+
 			KEYS::AimbotKey1 = reader.GetInteger("KEYS", "AimbotKey1", VK_LBUTTON);
 			KEYS::AimbotKey2 = reader.GetInteger("KEYS", "AimbotKey2", 0x56);
 			KEYS::BhopKey = reader.GetInteger("KEYS", "BhopKey", VK_SPACE);
 			KEYS::DDrunKey = reader.GetInteger("KEYS", "DDrunKey", VK_MENU);
 			KEYS::MenuKey = reader.GetInteger("KEYS", "MenuKey", VK_INSERT);
+			KEYS::TriggerbotKey = reader.GetInteger("KEYS", "TriggerbotKey", 0x56);
 			return true;
 		}
 	}
 	return false;
 }
-
-
-
