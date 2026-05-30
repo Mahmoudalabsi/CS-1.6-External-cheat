@@ -17,36 +17,36 @@
 
 void RenderLine(const ImVec2& from, const ImVec2& to, ImVec4 color, float thickness)
 {
-	ImDrawList* Draw = ImGui::GetWindowDrawList();
+	ImDrawList* Draw = ImGui::GetForegroundDrawList();
 	Draw->AddLine(from, to, ImGui::GetColorU32(color), thickness);
 }
 
 void RenderCircle(const ImVec2& position, float radius, ImVec4 color, float thickness, uint32_t segments)
 {
-	ImDrawList* Draw = ImGui::GetWindowDrawList();
+	ImDrawList* Draw = ImGui::GetForegroundDrawList();
 	Draw->AddCircle(position, radius, ImGui::GetColorU32(color), segments, thickness);
 }
 
 void RenderCircleFilled(const ImVec2& position, float radius, ImVec4 color, uint32_t segments)
 {
-	ImDrawList* Draw = ImGui::GetWindowDrawList();
+	ImDrawList* Draw = ImGui::GetForegroundDrawList();
 	Draw->AddCircleFilled(position, radius, ImGui::GetColorU32(color), segments);
 }
 
 void RenderRect(const ImVec2& from, const ImVec2& to, ImVec4 color, float rounding, uint32_t roundingCornersFlags, float thickness)
 {
-	ImDrawList* Draw = ImGui::GetWindowDrawList();
+	ImDrawList* Draw = ImGui::GetForegroundDrawList();
 	Draw->AddRect(from, to, ImGui::GetColorU32(color), rounding, roundingCornersFlags, thickness);
 }
 
 void RenderRectFilled(const ImVec2& from, const ImVec2& to, ImVec4 color, float rounding, uint32_t roundingCornersFlags)
 {
-	ImDrawList* Draw = ImGui::GetWindowDrawList();
+	ImDrawList* Draw = ImGui::GetForegroundDrawList();
 	Draw->AddRectFilled(from, to, ImGui::GetColorU32(color), rounding, roundingCornersFlags);
 }
 float RenderText(const std::string text, const ImVec2& position, float size, ImVec4 color, bool center, ImFont* DefaultFont)
 {
-	ImDrawList* Draw = ImGui::GetWindowDrawList();
+	ImDrawList* Draw = ImGui::GetForegroundDrawList();
 
 	std::stringstream stream(text);
 	std::string line;
