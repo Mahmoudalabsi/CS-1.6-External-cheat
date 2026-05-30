@@ -857,17 +857,17 @@ int main(int, char**)
                                                 Vector3 AimPos = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z + 10.f));
                                                 TargetsWS.push_back(Vector3(AimPos.x, AimPos.y + abs(recoil) * Aimbot::RCS, 0));
                                                 if (Draw.x < 4) continue;
-                                                // Team ESP filter
+                                                // Team ESP filter - VIP is ALWAYS enemy
                                                 {
                                                         int HisTeam = 0;
                                                         std::string modelname = TargetModels[i];
-                                                        // CT models: urban, gsg9, sas, gign, spetsnaz, vip
+                                                        bool isVIP = (modelname.find("vip") != std::string::npos);
+                                                        // CT models: urban, gsg9, sas, gign, spetsnaz (vip removed - always enemy)
                                                         bool isCT = (modelname.find("urb") != std::string::npos ||
                                                                 modelname.find("gsg") != std::string::npos ||
                                                                 modelname.find("sas") != std::string::npos ||
                                                                 modelname.find("gig") != std::string::npos ||
-                                                                modelname.find("spe") != std::string::npos ||
-                                                                modelname.find("vip") != std::string::npos);
+                                                                modelname.find("spe") != std::string::npos);
                                                         // T models: terror, arctic, guerrilla, leet, militia
                                                         bool isT = (modelname.find("ter") != std::string::npos ||
                                                                 modelname.find("arc") != std::string::npos ||
@@ -876,8 +876,9 @@ int main(int, char**)
                                                                 modelname.find("mil") != std::string::npos);
                                                         if (isCT) HisTeam = 2;
                                                         if (isT) HisTeam = 1;
-                                                        if (HisTeam == PlayerTeam && !ESP::ShowTeam) continue;
-                                                        if (HisTeam == PlayerTeam && !Aimbot::Deathmatch) continue;
+                                                        // VIP is always enemy - never skip even if on same team
+                                                        if (!isVIP && HisTeam == PlayerTeam && !ESP::ShowTeam) continue;
+                                                        if (!isVIP && HisTeam == PlayerTeam && !Aimbot::Deathmatch) continue;
                                                 }
                                                 //if (drawdot) RenderRectFilled(ImVec2(Draw.x - 2, Draw.y - 2), ImVec2(Draw.x + 2, Draw.y + 2), ImVec4(1.f, 0.f, 0.f, 1.f), 0, 0);// FillRGB(Draw.x - 2, Draw.y - 2, 4, 4, 255, 0, 0, 155);
 
