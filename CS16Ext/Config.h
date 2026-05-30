@@ -46,6 +46,7 @@ void RefreshSettings()
 	{
 		std::string outpath = it->c_str();
 		SettingsList.push_back(outpath);
+		//remove(it->c_str());
 		it++;
 	}
 }
@@ -85,10 +86,6 @@ void SaveConfig(std::string ConfigName)
 	ofs << "BoxRounding = " << ESP::BoxRounding << "\n";
 	ofs << "BoxWidth = " << ESP::BoxWidth << "\n";
 	ofs << "ShowTeam = " << ESP::ShowTeam << "\n";
-	ofs << "TeamBoxColorR = " << ESP::TeamBoxColor[0] << "\n";
-	ofs << "TeamBoxColorG = " << ESP::TeamBoxColor[1] << "\n";
-	ofs << "TeamBoxColorB = " << ESP::TeamBoxColor[2] << "\n";
-	ofs << "TeamBoxColorA = " << ESP::TeamBoxColor[3] << "\n";
 
 	ofs << "Dist = " << ESP::Dist << "\n";
 	ofs << "DistColorR = " << ESP::DistColor[0] << "\n";
@@ -117,7 +114,6 @@ void SaveConfig(std::string ConfigName)
 	ofs << "FpsUnlock = " << MISC::FpsUnlock << "\n";
 
 	ofs << "[TRIGGERBOT]\n";
-
 	ofs << "Enabled = " << TRIGGERBOT::Enabled << "\n";
 	ofs << "Delay = " << TRIGGERBOT::Delay << "\n";
 	ofs << "ShotDelay = " << TRIGGERBOT::ShotDelay << "\n";
@@ -168,10 +164,6 @@ bool LoadConfig(std::string ConfigName)
 			ESP::BoxRounding = reader.GetReal("ESP", "BoxRounding", 1.f);
 			ESP::BoxWidth = reader.GetReal("ESP", "BoxWidth", 1.f);
 			ESP::ShowTeam = reader.GetBoolean("ESP", "ShowTeam", true);
-			ESP::TeamBoxColor[0] = reader.GetReal("ESP", "TeamBoxColorR", 0.3f);
-			ESP::TeamBoxColor[1] = reader.GetReal("ESP", "TeamBoxColorG", 0.5f);
-			ESP::TeamBoxColor[2] = reader.GetReal("ESP", "TeamBoxColorB", 1.f);
-			ESP::TeamBoxColor[3] = reader.GetReal("ESP", "TeamBoxColorA", 0.6f);
 
 			ESP::Dist = reader.GetReal("ESP", "Dist", 1.f);
 			ESP::DistColor[0] = reader.GetReal("ESP", "DistColorR", 1.f);
@@ -187,8 +179,8 @@ bool LoadConfig(std::string ConfigName)
 
 			ESP::Crosshair = reader.GetReal("ESP", "Crosshair", 1.f);
 			ESP::CrosshairColor[0] = reader.GetReal("ESP", "CrosshairColorR", 1.f);
-			ESP::CrosshairColor[1] = reader.GetReal("ESP", "CrosshairColorG", 0.f);
-			ESP::CrosshairColor[2] = reader.GetReal("ESP", "CrosshairColorB", 0.f);
+			ESP::CrosshairColor[1] = reader.GetReal("ESP", "CrosshairColorG", 1.f);
+			ESP::CrosshairColor[2] = reader.GetReal("ESP", "CrosshairColorB", 1.f);
 			ESP::CrosshairColor[3] = reader.GetReal("ESP", "CrosshairColorA", 1.f);
 			ESP::CrosshairSize = reader.GetReal("ESP", "CrosshairSize", 5.f);
 			ESP::CrosshairWidth = reader.GetReal("ESP", "CrosshairWidth", 1.f);
