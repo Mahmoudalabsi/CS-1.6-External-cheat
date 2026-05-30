@@ -192,32 +192,32 @@ void Hack()
                                                 m->Read(m->eDll.base + Offsets::Model, localModelBuf, 64);
                                                 std::string localMdl = localModelBuf;
 
+                                                bool localIsVIP = (localMdl.find("vip") != std::string::npos);
                                                 bool localIsCT = (localMdl.find("urban") != std::string::npos ||
                                                         localMdl.find("gsg9") != std::string::npos ||
                                                         localMdl.find("sas") != std::string::npos ||
                                                         localMdl.find("gign") != std::string::npos ||
-                                                        localMdl.find("spetsnaz") != std::string::npos ||
-                                                        localMdl.find("vip") != std::string::npos);
+                                                        localMdl.find("spetsnaz") != std::string::npos);
                                                 bool localIsT = (localMdl.find("terror") != std::string::npos ||
                                                         localMdl.find("arctic") != std::string::npos ||
                                                         localMdl.find("guerrilla") != std::string::npos ||
                                                         localMdl.find("leet") != std::string::npos ||
                                                         localMdl.find("militia") != std::string::npos);
 
+                                                bool targetIsVIP = (targetMdl.find("vip") != std::string::npos);
                                                 bool targetIsCT = (targetMdl.find("urban") != std::string::npos ||
                                                         targetMdl.find("gsg9") != std::string::npos ||
                                                         targetMdl.find("sas") != std::string::npos ||
                                                         targetMdl.find("gign") != std::string::npos ||
-                                                        targetMdl.find("spetsnaz") != std::string::npos ||
-                                                        targetMdl.find("vip") != std::string::npos);
+                                                        targetMdl.find("spetsnaz") != std::string::npos);
                                                 bool targetIsT = (targetMdl.find("terror") != std::string::npos ||
                                                         targetMdl.find("arctic") != std::string::npos ||
                                                         targetMdl.find("guerrilla") != std::string::npos ||
                                                         targetMdl.find("leet") != std::string::npos ||
                                                         targetMdl.find("militia") != std::string::npos);
 
-                                                // Only shoot if target is on the ENEMY team
-                                                if ((localIsCT && targetIsT) || (localIsT && targetIsCT))
+                                                // Shoot if target is enemy team OR target is VIP (always enemy)
+                                                if (targetIsVIP || (localIsCT && targetIsT) || (localIsT && targetIsCT))
                                                         shouldShoot = true;
                                         }
                                 }
