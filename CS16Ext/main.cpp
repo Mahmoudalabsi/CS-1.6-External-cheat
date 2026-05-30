@@ -23,6 +23,10 @@ float gWorldToScreen[16];
 int InMenu;
 float recoil;
 
+// Triggerbot state
+DWORD triggerLastShotTime = 0;
+bool triggerIsShooting = false;
+
 std::vector<float> Anims;
 std::vector<float> OldAnims;
 std::vector<float> OldOldAnims;
@@ -41,6 +45,8 @@ bool SetBhopKey = false;
 std::string BhopKeyLabel = "SPACE";
 bool SetDDrunKey = false;
 std::string DDrunKeyLabel = "ALT";
+bool SetTriggerbotKey = false;
+std::string TriggerbotKeyLabel = "V";
 
 void InitCheat()
 {
@@ -161,6 +167,85 @@ void Hack()
                                 }
                                 else m->WriteMem<int>(m->cDll.base + Offsets::dwForceAttack, 4);
                         }
+
+                        // ===== TRIGGERBOT =====
+                        if (TRIGGERBOT::Enabled && GetAsyncKeyState(KEYS::TriggerbotKey))
+                        {
+                                int crosshairEntity = m->ReadMem<int>(m->eDll.base + Offsets::InCross);
+
+                                if (crosshairEntity > 0 && crosshairEntity <= 30)
+                                {
+                                        // Check if entity is enemy (when Deathmatch mode is off)
+                                        bool isEnemy = true;
+                                        if (!TRIGGERBOT::Deathmatch)
+                                        {
+                                                int entityTeam = 0;
+                                                // Determine team from model name
+                                                std::string modelname = TargetModels[crosshairEntity];
+                                                if (modelname == "arc" || modelname == "gue" || modelname == "lee" || modelname == "ter")
+                                                        entityTeam = 1; // Terrorist
+                                                else
+                                                        entityTeam = 2; // CT
+
+                                                if (entityTeam == PlayerTeam)
+                                                        isEnemy = false;
+                                        }
+
+                                        if (isEnemy)
+                                        {
+                                                DWORD currentTime = GetTickCount();
+
+                                                // Apply delay before shooting (humanize reaction time)
+                                                if (!triggerIsShooting)
+                                                {
+                                                        if (currentTime - triggerLastShotTime >= (DWORD)TRIGGERBOT::Delay)
+                                                        {
+                                                                m->WriteMem<int>(m->cDll.base + Offsets::dwForceAttack, 5);
+                                                                triggerIsShooting = true;
+                                                                triggerLastShotTime = currentTime;
+                                                        }
+                                                }
+                                                else
+                                                {
+                                                        // Release attack and wait shot delay
+                                                        if (currentTime - triggerLastShotTime >= 10)
+                                                        {
+                                                                m->WriteMem<int>(m->cDll.base + Offsets::dwForceAttack, 4);
+                                                                triggerIsShooting = false;
+                                                                triggerLastShotTime = currentTime;
+                                                        }
+                                                }
+                                        }
+                                        else
+                                        {
+                                                // Not enemy - make sure attack is released
+                                                if (triggerIsShooting)
+                                                {
+                                                        m->WriteMem<int>(m->cDll.base + Offsets::dwForceAttack, 4);
+                                                        triggerIsShooting = false;
+                                                }
+                                        }
+                                }
+                                else
+                                {
+                                        // No entity in crosshair - release attack
+                                        if (triggerIsShooting)
+                                        {
+                                                m->WriteMem<int>(m->cDll.base + Offsets::dwForceAttack, 4);
+                                                triggerIsShooting = false;
+                                        }
+                                }
+                        }
+                        else
+                        {
+                                // Triggerbot not active - release attack if we were shooting
+                                if (triggerIsShooting)
+                                {
+                                        m->WriteMem<int>(m->cDll.base + Offsets::dwForceAttack, 4);
+                                        triggerIsShooting = false;
+                                }
+                        }
+                        // ===== END TRIGGERBOT =====
 
                         if (MISC::DDrun && GetAsyncKeyState(KEYS::DDrunKey))
                         {
@@ -413,6 +498,7 @@ int main(int, char**)
                                 if (ImGui::Button(("AIMBOT"), ImVec2(100, 25))) Page = 0;
                                 if (ImGui::Button(("ESP"), ImVec2(100, 25))) Page = 1;
                                 if (ImGui::Button(("MISC"), ImVec2(100, 25))) Page = 2;
+                                if (ImGui::Button(("TRIGGER"), ImVec2(100, 25))) Page = 5;
                                 if (ImGui::Button(("KEYS"), ImVec2(100, 25))) Page = 4;
                                 if (ImGui::Button(("CFG"), ImVec2(100, 25))) Page = 3;
                                 ImGui::TextWrapped("This cheat was made by KleskBY in 2019");
@@ -500,6 +586,18 @@ int main(int, char**)
                                         ImGui::Checkbox(("AutoPistol"), &MISC::AutoPistol);
                                         ImGui::Checkbox(("FPS Unlock"), &MISC::FpsUnlock);
                                 }
+                                else if (Page == 5)
+                                {
+                                        ImGui::Spacing(0, 5);
+                                        ImGui::Checkbox(("Triggerbot"), &TRIGGERBOT::Enabled); ImGui::SameLine(); ImGui::Checkbox(("Deathmatch"), &TRIGGERBOT::Deathmatch);
+                                        ImGui::SliderInt(("Delay (ms)"), &TRIGGERBOT::Delay, 0, 500);
+                                        ImGui::SliderInt(("Shot Delay (ms)"), &TRIGGERBOT::ShotDelay, 10, 500);
+                                        ImGui::TextWrapped("Hold the triggerbot key to activate.");
+                                        ImGui::TextWrapped("When an enemy is in your crosshair,");
+                                        ImGui::TextWrapped("the cheat will automatically shoot.");
+                                        ImGui::TextWrapped("Delay adds human-like reaction time.");
+                                        ImGui::TextWrapped("Shot Delay controls time between shots.");
+                                }
                                 else if (Page == 3)
                                 {
                                         ImGui::Spacing(0, 5);
@@ -561,6 +659,8 @@ int main(int, char**)
                                                                 else  BhopKeyLabel = ("unknown");
                                                                 if (Keys[KEYS::DDrunKey] != NULL) DDrunKeyLabel = Keys[KEYS::DDrunKey];
                                                                 else  DDrunKeyLabel = ("unknown");
+                                                                if (Keys[KEYS::TriggerbotKey] != NULL) TriggerbotKeyLabel = Keys[KEYS::TriggerbotKey];
+                                                                else  TriggerbotKeyLabel = ("unknown");
                                                         }
                                                 }
                                                 Beep(300, 100);
@@ -654,6 +754,22 @@ int main(int, char**)
                                         ImGui::SameLine();  ImGui::Text("Aimbot2 key");
 
                                         ImGui::Spacing(0, 5);
+                                        if (ImGui::Button((TriggerbotKeyLabel + "##TriggerbotKeyLabel").c_str(), ImVec2(200, 25))) SetTriggerbotKey = true;
+                                        while (SetTriggerbotKey)
+                                        {
+                                                for (int i = 0; i < 256; i++)
+                                                {
+                                                        if (GetAsyncKeyState(i) & 0x8000)
+                                                        {
+                                                                KEYS::TriggerbotKey = i;
+                                                                TriggerbotKeyLabel = Keys[i];
+                                                                SetTriggerbotKey = false;
+                                                        }
+                                                }
+                                        }
+                                        ImGui::SameLine();  ImGui::Text("Triggerbot key");
+
+                                        ImGui::Spacing(0, 5);
                                         if (ImGui::Button((BhopKeyLabel + "##BhopKeyLabel").c_str(), ImVec2(200, 25))) SetBhopKey = true;
                                         while (SetBhopKey)
                                         {
@@ -704,12 +820,11 @@ int main(int, char**)
                                 ImGui::Text(std::to_string(WeaponID).c_str());
                                 // ===== DEBUG INFO (Evelion ViewMatrix) =====
                                 ImGui::Text("Matrix[0-3]:  %.3f, %.3f, %.3f, %.3f", gWorldToScreen[0], gWorldToScreen[1], gWorldToScreen[2], gWorldToScreen[3]);
-                                ImGui::Text("Matrix[4-7]:  %.3f, %.3f, %.3f, %.3f", gWorldToScreen[4], gWorldToScreen[5], gWorldToScreen[6], gWorldToScreen[7]);
-                                ImGui::Text("Matrix[8-11]: %.3f, %.3f, %.3f, %.3f", gWorldToScreen[8], gWorldToScreen[9], gWorldToScreen[10], gWorldToScreen[11]);
-                                ImGui::Text("Matrix[12-15]: %.3f, %.3f, %.3f, %.3f", gWorldToScreen[12], gWorldToScreen[13], gWorldToScreen[14], gWorldToScreen[15]);
                                 ImGui::Text("Recoil: %.4f", recoil);
                                 ImGui::Text("InMenu: %d", InMenu);
                                 ImGui::Text("PlayerTeam: %d", PlayerTeam);
+                                int dbgInCross = m->ReadMem<int>(m->eDll.base + Offsets::InCross);
+                                ImGui::Text("InCross: %d", dbgInCross);
                                 // ===== END DEBUG =====
                                 int BestTarget = -1;
                                 double ClosestPos = 9999999;
@@ -786,65 +901,25 @@ int main(int, char**)
                                                 }
                                                 if (ESP::Names)
                                                 {
-                                                        Vector3 Draw4 = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z + 25.f));
-                                                        RenderText(TargetNames[i], ImVec2(Draw4.x, Draw4.y - 8), 16.f, ImVec4(ESP::NamesColor[0], ESP::NamesColor[1], ESP::NamesColor[2], ESP::NamesColor[3]), true, fontEsp);
-                                                }
-
-                                                if (Aimbot::Enabled && !InMenu)
-                                                {
-                                                        float CrosshairDistance = Draw.DistTo(Vector3(ScreenCenterX, ScreenCenterY, 0));
-                                                        if (CrosshairDistance > 200) continue;
-
-                                                        if (Draw.x >= ScreenCenterX - radiusx && Draw.x <= ScreenCenterX + radiusx && Draw.y >= ScreenCenterY - radiusy && Draw.y <= ScreenCenterY + radiusy)
-                                                        {
-                                                                if (CrosshairDistance < ClosestPos) 
-                                                                {
-                                                                        ClosestPos = CrosshairDistance;
-                                                                        BestTarget = i;
-                                                                }
-                                                        }
+                                                        Vector3 Draw4 = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z + 40.f));
+                                                        RenderText(TargetNames[i], ImVec2(Draw4.x, Draw4.y), 16.f, ImVec4(ESP::NamesColor[0], ESP::NamesColor[1], ESP::NamesColor[2], ESP::NamesColor[3]), true, fontEsp);
                                                 }
                                         }
                                 }
-                                if (Aimbot::Enabled)
-                                {
-                                        if (BestTarget != -1)
-                                        {
-                                                double DistX = (double)TargetsWS[BestTarget].x - ScreenCenterX;
-                                                double DistY = (double)TargetsWS[BestTarget].y - ScreenCenterY;
 
-                                                DistX /= Aimbot::Smooth;
-                                                DistY /= Aimbot::Smooth;
-
-                                                if (GetAsyncKeyState(KEYS::AimbotKey1) & 0x8000 || GetAsyncKeyState(KEYS::AimbotKey2) & 0x8000) mouse_event(MOUSEEVENTF_MOVE, (int)DistX, (int)DistY, NULL, NULL);
-                                        }
-                                }
-
-                                ImDrawList* Draw = ImGui::GetWindowDrawList();
-                                Draw->PushClipRectFullScreen();
-
-                                ImGui::End();
                                 ImGui::PopStyleColor();
                                 ImGui::PopStyleVar(2);
+                                ImGui::End();
                         }
 
                         ImGui::EndFrame();
-                        ImGui::Render();
-                        ImGui_ImplDX9_RenderDrawData(ImGui::GetDrawData());
-                        g_pd3dDevice->EndScene();
-                }
-                HRESULT result = g_pd3dDevice->Present(NULL, NULL, NULL, NULL);
-                if (result == D3DERR_DEVICELOST && g_pd3dDevice->TestCooperativeLevel() == D3DERR_DEVICENOTRESET)
-                {
-                        ResetDevice();
-                        InitCheat();
+                        g_pd3dDevice->Present(0, 0, 0, 0);
                 }
         }
 
         ImGui_ImplDX9_Shutdown();
         ImGui_ImplWin32_Shutdown();
         ImGui::DestroyContext();
-
         CleanupDeviceD3D();
         DestroyWindow(g_hwnd);
         UnregisterClass(wc.lpszClassName, wc.hInstance);
