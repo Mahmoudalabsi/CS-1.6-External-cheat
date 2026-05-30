@@ -881,40 +881,45 @@ int main(int, char**)
                                                 }
                                                 //if (drawdot) RenderRectFilled(ImVec2(Draw.x - 2, Draw.y - 2), ImVec2(Draw.x + 2, Draw.y + 2), ImVec4(1.f, 0.f, 0.f, 1.f), 0, 0);// FillRGB(Draw.x - 2, Draw.y - 2, 4, 4, 255, 0, 0, 155);
 
-                                                Vector3 Draw2 = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z - 50.f));
-                                                int boxheight = (Draw2.y - Draw.y) * 1.25;
+                                                Vector3 Draw2 = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z - 72.f));
+                                                float boxH = Draw2.y - Draw.y;
+                                                float boxW = boxH / 2.0f;
+                                                float centerX = (Draw.x + Draw2.x) / 2.0f;
+                                                float boxTop = Draw.y - 2;
+                                                float boxBot = Draw2.y + 2;
+                                                float boxLeft = centerX - boxW / 2;
+                                                float boxRight = centerX + boxW / 2;
                                                 if (ESP::Box)
                                                 {
                                                         if(ESP::BoxType == 0)
-                                                        RenderRect(ImVec2(Draw2.x - boxheight / 4, Draw.y - boxheight * 0.25), ImVec2(Draw2.x + boxheight / 3.2, Draw.y + boxheight * 0.85), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxRounding, ImDrawCornerFlags_All, ESP::BoxWidth);// boxheight / 2, boxheight, 1, 255, 0, 0, 255);
+                                                        RenderRect(ImVec2(boxLeft, boxTop), ImVec2(boxRight, boxBot), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxRounding, ImDrawCornerFlags_All, ESP::BoxWidth);
                                                         else
                                                         {
-                                                                float boxwidth = (Draw2.x - boxheight / 4) - (Draw2.x + boxheight / 3.2);
-                                                                float lineW = (boxwidth / 5);
-                                                                float lineH = (boxheight / 6);
+                                                                float lineW = (boxW / 5);
+                                                                float lineH = (boxH / 6);
 
-                                                                RenderLine(ImVec2(Draw2.x - boxheight / 4, Draw.y - boxheight * 0.25), ImVec2(Draw2.x - boxheight / 4 - lineW, Draw.y - boxheight * 0.25), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
-                                                                RenderLine(ImVec2(Draw2.x - boxheight / 4, Draw.y - boxheight * 0.25), ImVec2(Draw2.x - boxheight / 4, Draw.y - boxheight * 0.25 + lineH), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
+                                                                RenderLine(ImVec2(boxLeft, boxTop), ImVec2(boxLeft + lineW, boxTop), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
+                                                                RenderLine(ImVec2(boxLeft, boxTop), ImVec2(boxLeft, boxTop + lineH), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
 
-                                                                RenderLine(ImVec2(Draw2.x - boxheight / 4, Draw.y - boxheight * 0.25 + boxheight - lineH), ImVec2(Draw2.x - boxheight / 4, Draw.y - boxheight * 0.25 + boxheight), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
-                                                                RenderLine(ImVec2(Draw2.x - boxheight / 4, Draw.y - boxheight * 0.25 + boxheight), ImVec2(Draw2.x - boxheight / 4-lineW, Draw.y - boxheight * 0.25 + boxheight), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
+                                                                RenderLine(ImVec2(boxRight - lineW, boxTop), ImVec2(boxRight, boxTop), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
+                                                                RenderLine(ImVec2(boxRight, boxTop), ImVec2(boxRight, boxTop + lineH), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
 
-                                                                RenderLine(ImVec2(Draw2.x - boxheight / 4 - boxwidth + lineW, Draw.y - boxheight * 0.25), ImVec2(Draw2.x - boxheight / 4 - boxwidth, Draw.y - boxheight * 0.25), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
-                                                                RenderLine(ImVec2(Draw2.x - boxheight / 4 - boxwidth, Draw.y - boxheight * 0.25), ImVec2(Draw2.x - boxheight / 4 - boxwidth, Draw.y - boxheight * 0.25 + lineH), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
+                                                                RenderLine(ImVec2(boxLeft, boxBot - lineH), ImVec2(boxLeft, boxBot), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
+                                                                RenderLine(ImVec2(boxLeft, boxBot), ImVec2(boxLeft + lineW, boxBot), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
 
-                                                                RenderLine(ImVec2(Draw2.x - boxheight / 4 - boxwidth, Draw.y - boxheight * 0.25 + boxheight - lineH), ImVec2(Draw2.x - boxheight / 4 - boxwidth, Draw.y - boxheight * 0.25 + boxheight), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
-                                                                RenderLine(ImVec2(Draw2.x - boxheight / 4 - boxwidth, Draw.y - boxheight * 0.25 + boxheight), ImVec2(Draw2.x - boxheight / 4 - boxwidth + lineW, Draw.y - boxheight * 0.25 + boxheight), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
+                                                                RenderLine(ImVec2(boxRight, boxBot - lineH), ImVec2(boxRight, boxBot), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
+                                                                RenderLine(ImVec2(boxRight - lineW, boxBot), ImVec2(boxRight, boxBot), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
                                                         }
                                                 }
                                                 float dist = Targets[i].DistTo(Targets[0]) * 0.254;
                                                 if (ESP::Dist)
                                                 {
-                                                        Vector3 Draw3 = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z - 55.f));
+                                                        Vector3 Draw3 = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z - 78.f));
                                                         RenderText(std::to_string((int)dist), ImVec2(Draw3.x, Draw3.y), 16.f, ImVec4(ESP::DistColor[0], ESP::DistColor[1], ESP::DistColor[2], ESP::DistColor[3]), true, fontEsp);
                                                 }
                                                 if (ESP::Names)
                                                 {
-                                                        Vector3 Draw4 = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z + 25.f));
+                                                        Vector3 Draw4 = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z + 30.f));
                                                         RenderText(TargetNames[i], ImVec2(Draw4.x, Draw4.y - 8), 16.f, ImVec4(ESP::NamesColor[0], ESP::NamesColor[1], ESP::NamesColor[2], ESP::NamesColor[3]), true, fontEsp);
                                                 }
 
