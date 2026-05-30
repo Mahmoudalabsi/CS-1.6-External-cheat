@@ -27,7 +27,7 @@ static int Height = 480;
 static bool open = true;
 static bool ShowMenu = true;
 
-static MARGINS MARGIN = { 0, 0, Width, Height };
+static MARGINS MARGIN = { -1, -1, -1, -1 };
 
 using namespace std;
 
@@ -86,3 +86,4 @@ static const char* Keys[] =
 	   "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE",
 	   "LSHIFT", "RSHIFT", "LCTRL", "RCTRL", "LALT", "RALT", "BACK", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE"
 };
+
