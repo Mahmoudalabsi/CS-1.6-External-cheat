@@ -33,6 +33,8 @@ namespace ESP
 	static float BoxColor[4] = { 1.f,1.f,1.f,1.f };
 	static float BoxRounding = 0.f;
 	static float BoxWidth = 1.f;
+	static bool ShowTeam = true;       // Show ESP on teammates (toggle to hide team boxes)
+	static float TeamBoxColor[4] = { 0.3f,0.5f,1.f,0.6f };  // Teammate box color (blue, semi-transparent)
 	static bool Dist = true;
 	static float DistColor[4] = { 1.f,1.f,1.f,1.f };
 	static bool Names = true;
@@ -54,7 +56,6 @@ namespace MISC
 namespace TRIGGERBOT
 {
 	static bool Enabled = false;
-	static float FOV = 5.f;         // Trigger radius (screen-space FOV in degrees)
 	static int Delay = 50;          // ms delay before shooting (humanize)
 	static int ShotDelay = 100;     // ms between shots (burst control)
 	static bool Deathmatch = true;  // shoot enemies only (ignore teammates)
@@ -67,5 +68,4 @@ namespace KEYS
 	int BhopKey = VK_SPACE;
 	int DDrunKey = VK_MENU;
 	int MenuKey = VK_INSERT;
-	// No TriggerbotKey - triggerbot is toggled from menu only
 }
