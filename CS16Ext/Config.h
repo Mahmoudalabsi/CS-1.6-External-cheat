@@ -46,7 +46,6 @@ void RefreshSettings()
 	{
 		std::string outpath = it->c_str();
 		SettingsList.push_back(outpath);
-		//remove(it->c_str());
 		it++;
 	}
 }
@@ -115,6 +114,7 @@ void SaveConfig(std::string ConfigName)
 	ofs << "[TRIGGERBOT]\n";
 
 	ofs << "Enabled = " << TRIGGERBOT::Enabled << "\n";
+	ofs << "FOV = " << TRIGGERBOT::FOV << "\n";
 	ofs << "Delay = " << TRIGGERBOT::Delay << "\n";
 	ofs << "ShotDelay = " << TRIGGERBOT::ShotDelay << "\n";
 	ofs << "Deathmatch = " << TRIGGERBOT::Deathmatch << "\n";
@@ -126,7 +126,6 @@ void SaveConfig(std::string ConfigName)
 	ofs << "BhopKey = " << KEYS::BhopKey << "\n";
 	ofs << "DDrunKey = " << KEYS::DDrunKey << "\n";
 	ofs << "MenuKey = " << KEYS::MenuKey << "\n";
-	ofs << "TriggerbotKey = " << KEYS::TriggerbotKey << "\n";
 
 	ofs.close();
 }
@@ -191,6 +190,7 @@ bool LoadConfig(std::string ConfigName)
 			MISC::FpsUnlock = reader.GetBoolean("MISC", "FpsUnlock", false);
 
 			TRIGGERBOT::Enabled = reader.GetBoolean("TRIGGERBOT", "Enabled", false);
+			TRIGGERBOT::FOV = (float)reader.GetReal("TRIGGERBOT", "FOV", 5.f);
 			TRIGGERBOT::Delay = reader.GetInteger("TRIGGERBOT", "Delay", 50);
 			TRIGGERBOT::ShotDelay = reader.GetInteger("TRIGGERBOT", "ShotDelay", 100);
 			TRIGGERBOT::Deathmatch = reader.GetBoolean("TRIGGERBOT", "Deathmatch", true);
@@ -200,7 +200,6 @@ bool LoadConfig(std::string ConfigName)
 			KEYS::BhopKey = reader.GetInteger("KEYS", "BhopKey", VK_SPACE);
 			KEYS::DDrunKey = reader.GetInteger("KEYS", "DDrunKey", VK_MENU);
 			KEYS::MenuKey = reader.GetInteger("KEYS", "MenuKey", VK_INSERT);
-			KEYS::TriggerbotKey = reader.GetInteger("KEYS", "TriggerbotKey", 0x56);
 			return true;
 		}
 	}
