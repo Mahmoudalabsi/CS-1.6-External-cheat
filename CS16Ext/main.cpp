@@ -173,7 +173,7 @@ void Hack()
                         {
                                 int crosshairEntity = m->ReadMem<int>(m->eDll.base + Offsets::InCross);
 
-                                if (crosshairEntity > 0 && crosshairEntity <= 30)
+                                if (crosshairEntity > 0 && crosshairEntity < (int)TargetModels.size())
                                 {
                                         // Check if entity is enemy (when Deathmatch mode is off)
                                         bool isEnemy = true;
@@ -818,11 +818,9 @@ int main(int, char**)
 
                                 ImGui::Text("  INTERIUM.OOO");
                                 ImGui::Text(std::to_string(WeaponID).c_str());
-                                // ===== DEBUG INFO (Evelion ViewMatrix) =====
-                                ImGui::Text("Matrix[0-3]:  %.3f, %.3f, %.3f, %.3f", gWorldToScreen[0], gWorldToScreen[1], gWorldToScreen[2], gWorldToScreen[3]);
+                                // ===== DEBUG INFO =====
                                 ImGui::Text("Recoil: %.4f", recoil);
-                                ImGui::Text("InMenu: %d", InMenu);
-                                ImGui::Text("PlayerTeam: %d", PlayerTeam);
+                                ImGui::Text("InMenu: %d  Team: %d", InMenu, PlayerTeam);
                                 int dbgInCross = m->ReadMem<int>(m->eDll.base + Offsets::InCross);
                                 ImGui::Text("InCross: %d", dbgInCross);
                                 // ===== END DEBUG =====
@@ -866,14 +864,14 @@ int main(int, char**)
                                                         }
                                                         if (HisTeam == PlayerTeam) continue;
                                                 }
-                                                //if (drawdot) RenderRectFilled(ImVec2(Draw.x - 2, Draw.y - 2), ImVec2(Draw.x + 2, Draw.y + 2), ImVec4(1.f, 0.f, 0.f, 1.f), 0, 0);// FillRGB(Draw.x - 2, Draw.y - 2, 4, 4, 255, 0, 0, 155);
+                                                //if (drawdot) RenderRectFilled(ImVec2(Draw.x - 2, Draw.y - 2), ImVec2(Draw.x + 2, Draw.y + 2), ImVec4(1.f, 0.f, 0.f, 1.f), 0, 0);
 
                                                 Vector3 Draw2 = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z - 50.f));
                                                 int boxheight = (Draw2.y - Draw.y) * 1.25;
                                                 if (ESP::Box)
                                                 {
                                                         if(ESP::BoxType == 0)
-                                                        RenderRect(ImVec2(Draw2.x - boxheight / 4, Draw.y - boxheight * 0.25), ImVec2(Draw2.x + boxheight / 3.2, Draw.y + boxheight * 0.85), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxRounding, ImDrawCornerFlags_All, ESP::BoxWidth);// boxheight / 2, boxheight, 1, 255, 0, 0, 255);
+                                                        RenderRect(ImVec2(Draw2.x - boxheight / 4, Draw.y - boxheight * 0.25), ImVec2(Draw2.x + boxheight / 3.2, Draw.y + boxheight * 0.85), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxRounding, ImDrawCornerFlags_All, ESP::BoxWidth);
                                                         else
                                                         {
                                                                 float boxwidth = (Draw2.x - boxheight / 4) - (Draw2.x + boxheight / 3.2);
@@ -901,25 +899,65 @@ int main(int, char**)
                                                 }
                                                 if (ESP::Names)
                                                 {
-                                                        Vector3 Draw4 = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z + 40.f));
-                                                        RenderText(TargetNames[i], ImVec2(Draw4.x, Draw4.y), 16.f, ImVec4(ESP::NamesColor[0], ESP::NamesColor[1], ESP::NamesColor[2], ESP::NamesColor[3]), true, fontEsp);
+                                                        Vector3 Draw4 = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z + 25.f));
+                                                        RenderText(TargetNames[i], ImVec2(Draw4.x, Draw4.y - 8), 16.f, ImVec4(ESP::NamesColor[0], ESP::NamesColor[1], ESP::NamesColor[2], ESP::NamesColor[3]), true, fontEsp);
+                                                }
+
+                                                if (Aimbot::Enabled && !InMenu)
+                                                {
+                                                        float CrosshairDistance = Draw.DistTo(Vector3(ScreenCenterX, ScreenCenterY, 0));
+                                                        if (CrosshairDistance > 200) continue;
+
+                                                        if (Draw.x >= ScreenCenterX - radiusx && Draw.x <= ScreenCenterX + radiusx && Draw.y >= ScreenCenterY - radiusy && Draw.y <= ScreenCenterY + radiusy)
+                                                        {
+                                                                if (CrosshairDistance < ClosestPos) 
+                                                                {
+                                                                        ClosestPos = CrosshairDistance;
+                                                                        BestTarget = i;
+                                                                }
+                                                        }
                                                 }
                                         }
                                 }
+                                if (Aimbot::Enabled)
+                                {
+                                        if (BestTarget != -1)
+                                        {
+                                                double DistX = (double)TargetsWS[BestTarget].x - ScreenCenterX;
+                                                double DistY = (double)TargetsWS[BestTarget].y - ScreenCenterY;
 
+                                                DistX /= Aimbot::Smooth;
+                                                DistY /= Aimbot::Smooth;
+
+                                                if (GetAsyncKeyState(KEYS::AimbotKey1) & 0x8000 || GetAsyncKeyState(KEYS::AimbotKey2) & 0x8000) mouse_event(MOUSEEVENTF_MOVE, (int)DistX, (int)DistY, NULL, NULL);
+                                        }
+                                }
+
+                                ImDrawList* Draw = ImGui::GetWindowDrawList();
+                                Draw->PushClipRectFullScreen();
+
+                                ImGui::End();
                                 ImGui::PopStyleColor();
                                 ImGui::PopStyleVar(2);
-                                ImGui::End();
                         }
 
                         ImGui::EndFrame();
-                        g_pd3dDevice->Present(0, 0, 0, 0);
+                        ImGui::Render();
+                        ImGui_ImplDX9_RenderDrawData(ImGui::GetDrawData());
+                        g_pd3dDevice->EndScene();
+                }
+                HRESULT result = g_pd3dDevice->Present(NULL, NULL, NULL, NULL);
+                if (result == D3DERR_DEVICELOST && g_pd3dDevice->TestCooperativeLevel() == D3DERR_DEVICENOTRESET)
+                {
+                        ResetDevice();
+                        InitCheat();
                 }
         }
 
         ImGui_ImplDX9_Shutdown();
         ImGui_ImplWin32_Shutdown();
         ImGui::DestroyContext();
+
         CleanupDeviceD3D();
         DestroyWindow(g_hwnd);
         UnregisterClass(wc.lpszClassName, wc.hInstance);
