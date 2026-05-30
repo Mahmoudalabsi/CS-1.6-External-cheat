@@ -409,10 +409,11 @@ int main(int, char**)
 	wc.lpszMenuName = WINNAME;
 	wc.style = CS_VREDRAW | CS_HREDRAW;
 	RegisterClassEx(&wc);
-	g_hwnd = CreateWindowEx(WS_EX_TOPMOST | WS_EX_TRANSPARENT , WINNAME, WINNAME, WS_POPUP, 0, 0, Width, Height, 0, 0, 0, 0);
+	g_hwnd = CreateWindowEx(WS_EX_TOPMOST | WS_EX_LAYERED , WINNAME, WINNAME, WS_POPUP, 0, 0, Width, Height, 0, 0, 0, 0);
 	SetLayeredWindowAttributes(g_hwnd, 0, 255, LWA_ALPHA);
 	SetLayeredWindowAttributes(g_hwnd, RGB(0, 0, 0), 0, ULW_COLORKEY);
 	DwmExtendFrameIntoClientArea(g_hwnd, &MARGIN);
+	ShowWindow(g_hwnd, SW_SHOW);
 	if (CreateDeviceD3D(g_hwnd) < 0) ExitProcess(1);
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO();
@@ -810,3 +811,4 @@ int main(int, char**)
 	UnregisterClass(wc.lpszClassName, wc.hInstance);
 	return 0;
 }
+
