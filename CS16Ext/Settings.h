@@ -6,10 +6,11 @@ static int yoffset = 0;
 
 struct ConfigWeapon
 {
-	bool Enabled;
-	float FOV;
-	float Smootch = 1.f;
-	float RCS;
+	bool 	Enabled;
+	float 	FOV;
+	float	Smootch = 1.f;
+	float	RCS;
+
 };
 static ConfigWeapon Weapons[40];
 
@@ -21,11 +22,11 @@ namespace Aimbot
 	static float FOV = 15.f;
 	static float Smooth = 2.f;
 	static float RCS = 4;
+
 	static bool DrawFov = true;
 	static float DrawFovColor[4] = { 1.f,1.f,1.f,1.f };
 	static float DrawFovWidth = 1.f;
 }
-
 namespace ESP
 {
 	static bool Box = true;
@@ -33,18 +34,18 @@ namespace ESP
 	static float BoxColor[4] = { 1.f,1.f,1.f,1.f };
 	static float BoxRounding = 0.f;
 	static float BoxWidth = 1.f;
-	static bool ShowTeam = true;       // Show ESP on teammates (toggle to hide team boxes)
-	static float TeamBoxColor[4] = { 0.3f,0.5f,1.f,0.6f };  // Teammate box color (blue, semi-transparent)
+	static bool ShowTeam = true;
+
 	static bool Dist = true;
 	static float DistColor[4] = { 1.f,1.f,1.f,1.f };
 	static bool Names = true;
 	static float NamesColor[4] = { 1.f,1.f,1.f,1.f };
+
 	static bool Crosshair = true;
 	static float CrosshairColor[4] = { 1.f,0.f,0.f,1.f };
 	static float CrosshairSize = 5.f;
 	static float CrosshairWidth = 1.f;
 }
-
 namespace MISC
 {
 	bool Bhop = false;
@@ -52,15 +53,13 @@ namespace MISC
 	bool AutoPistol = false;
 	bool FpsUnlock = false;
 }
-
 namespace TRIGGERBOT
 {
 	static bool Enabled = false;
-	static int Delay = 50;          // ms delay before shooting (humanize)
-	static int ShotDelay = 100;     // ms between shots (burst control)
-	static bool Deathmatch = true;  // shoot enemies only (ignore teammates)
+	static int Delay = 50;
+	static int ShotDelay = 100;
+	static bool Deathmatch = true;
 }
-
 namespace KEYS
 {
 	int AimbotKey1 = VK_LBUTTON;
