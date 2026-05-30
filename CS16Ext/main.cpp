@@ -853,7 +853,9 @@ int main(int, char**)
                                         else if(Targets[i].x != 0)
                                         {
                                                 Vector3 Draw = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z));
-                                                TargetsWS.push_back(Vector3(Draw.x, Draw.y + abs(recoil) * Aimbot::RCS, 0));
+                                                // Aimbot targets upper body (chest): z - 40 = upper torso for bigger hitbox
+                                                Vector3 AimPos = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z - 40.f));
+                                                TargetsWS.push_back(Vector3(AimPos.x, AimPos.y + abs(recoil) * Aimbot::RCS, 0));
                                                 if (Draw.x < 4) continue;
                                                 // Team ESP filter
                                                 {
