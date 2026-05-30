@@ -184,8 +184,17 @@ void Hack()
                                                 if (idx >= 0 && idx < (int)TargetModels.size())
                                                 {
                                                         std::string mdl = TargetModels[idx];
-                                                        bool isCT = (mdl == "urb" || mdl == "gsg" || mdl == "sas" || mdl == "gig");
-                                                        bool isT = (mdl == "ter" || mdl == "arc" || mdl == "gue" || mdl == "lee");
+                                                        bool isCT = (mdl.find("urb") != std::string::npos ||
+                                                                mdl.find("gsg") != std::string::npos ||
+                                                                mdl.find("sas") != std::string::npos ||
+                                                                mdl.find("gig") != std::string::npos ||
+                                                                mdl.find("spe") != std::string::npos ||
+                                                                mdl.find("vip") != std::string::npos);
+                                                        bool isT = (mdl.find("ter") != std::string::npos ||
+                                                                mdl.find("arc") != std::string::npos ||
+                                                                mdl.find("gue") != std::string::npos ||
+                                                                mdl.find("lee") != std::string::npos ||
+                                                                mdl.find("mil") != std::string::npos);
                                                         if (PlayerTeam == 1 && isT) shouldShoot = true;
                                                         if (PlayerTeam == 2 && isCT) shouldShoot = true;
                                                 }
@@ -366,8 +375,8 @@ void Updater()
                 TargetModels.clear();
                 for (int i = 0; i < 30; i++)
                 {
-                        char PlayerModel[3];
-                        m->Read(m->eDll.base + Offsets::Model + i * 592, PlayerModel, 3);
+                        char PlayerModel[64];
+                        m->Read(m->eDll.base + Offsets::Model + i * 592, PlayerModel, 64);
                         std::string Model = PlayerModel;
                         if (strlen(Model.c_str()) > 3) Model.substr(0, Model.size() - 2);
                         TargetModels.push_back(Model);
@@ -827,12 +836,23 @@ int main(int, char**)
                                                 if (Draw.x < 4) continue;
                                                 // Team ESP filter
                                                 {
-                                                        int HisTeam = 2;
+                                                        int HisTeam = 0;
                                                         std::string modelname = TargetModels[i];
-                                                        if (modelname == "arc" || modelname == "gue" || modelname == "lee" || modelname == "ter")
-                                                        {
-                                                                HisTeam = 1;
-                                                        }
+                                                        // CT models: urban, gsg9, sas, gign, spetsnaz, vip
+                                                        bool isCT = (modelname.find("urb") != std::string::npos ||
+                                                                modelname.find("gsg") != std::string::npos ||
+                                                                modelname.find("sas") != std::string::npos ||
+                                                                modelname.find("gig") != std::string::npos ||
+                                                                modelname.find("spe") != std::string::npos ||
+                                                                modelname.find("vip") != std::string::npos);
+                                                        // T models: terror, arctic, guerrilla, leet, militia
+                                                        bool isT = (modelname.find("ter") != std::string::npos ||
+                                                                modelname.find("arc") != std::string::npos ||
+                                                                modelname.find("gue") != std::string::npos ||
+                                                                modelname.find("lee") != std::string::npos ||
+                                                                modelname.find("mil") != std::string::npos);
+                                                        if (isCT) HisTeam = 2;
+                                                        if (isT) HisTeam = 1;
                                                         if (HisTeam == PlayerTeam && !ESP::ShowTeam) continue;
                                                         if (HisTeam == PlayerTeam && !Aimbot::Deathmatch) continue;
                                                 }
