@@ -180,7 +180,7 @@ void Hack()
                                         }
                                         else
                                         {
-                                                int idx = InCrossID - 1;
+                                                int idx = InCrossID;
                                                 if (idx >= 0 && idx < (int)TargetModels.size())
                                                 {
                                                         std::string mdl = TargetModels[idx];
@@ -195,8 +195,8 @@ void Hack()
                                                                 mdl.find("gue") != std::string::npos ||
                                                                 mdl.find("lee") != std::string::npos ||
                                                                 mdl.find("mil") != std::string::npos);
-                                                        if (PlayerTeam == 1 && isT) shouldShoot = true;
-                                                        if (PlayerTeam == 2 && isCT) shouldShoot = true;
+                                                        if (PlayerTeam == 1 && isCT) shouldShoot = true;  // We are T -> shoot CT
+                                                        if (PlayerTeam == 2 && isT) shouldShoot = true;   // We are CT -> shoot T
                                                 }
                                         }
                                 }
