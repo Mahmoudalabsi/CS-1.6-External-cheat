@@ -22,11 +22,9 @@ float recoil;
 // Triggerbot state
 DWORD triggerLastShotTime = 0;
 bool triggerIsShooting = false;
-// Triggerbot screen-space detection data
-std::vector<bool> TriggerEnemyInCross;
-std::vector<Vector3> Anims;
-std::vector<Vector3> OldAnims;
-std::vector<Vector3> OldOldAnims;
+std::vector<int> Anims;
+std::vector<int> OldAnims;
+std::vector<int> OldOldAnims;
 std::vector<Vector3> Targets;
 std::vector<Vector3> TargetsWS;
 std::vector<std::string> TargetModels;
@@ -168,7 +166,7 @@ void Hack()
 
 					// Convert entity feet position to screen
 					Vector3 screenFeet = W2S(Targets[i]);
-					if (screenFeet.x == 0 && screenFeet.y == 0) continue; // Behind camera
+					if (screenFeet.x == 0 && screenFeet.y == 0) continue;
 
 					// Convert entity head position to screen (head = feet + 72 units up)
 					Vector3 headWorld = Targets[i];
@@ -216,14 +214,13 @@ void Hack()
 						}
 						else
 						{
-							// No model data yet, skip this entity
 							continue;
 						}
 
 						if (isEnemy)
 						{
 							shouldShoot = true;
-							break; // Found enemy in crosshair
+							break;
 						}
 					}
 				}
@@ -234,7 +231,6 @@ void Hack()
 				{
 					if (!triggerIsShooting)
 					{
-						// First shot: apply delay before firing
 						if (currentTime - triggerLastShotTime >= (DWORD)TRIGGERBOT::Delay)
 						{
 							m->WriteMem<int>(m->cDll.base + Offsets::dwForceAttack, 5);
@@ -244,7 +240,6 @@ void Hack()
 					}
 					else
 					{
-						// Subsequent shots: wait for shot delay
 						if (currentTime - triggerLastShotTime >= (DWORD)TRIGGERBOT::ShotDelay)
 						{
 							m->WriteMem<int>(m->cDll.base + Offsets::dwForceAttack, 5);
@@ -264,7 +259,6 @@ void Hack()
 			}
 			else
 			{
-				// Triggerbot disabled: reset shooting state
 				if (triggerIsShooting)
 				{
 					m->WriteMem<int>(m->cDll.base + Offsets::dwForceAttack, 4);
@@ -700,7 +694,6 @@ int main(int, char**)
 				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.12f, 0.12f, 0.12f, 1.f));
 				ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
 				ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-				ImGui::PushClipRectFullScreen();
 				ImGui::End();
 				ImGui::PopStyleColor();
 				ImGui::PopStyleVar(2);
@@ -709,8 +702,8 @@ int main(int, char**)
 			{
 				int BestTarget = -1;
 				double ClosestPos = 9999999;
-				float ScreenCenterX = Width / 2;
-				float ScreenCenterY = Height / 2;
+				float ScreenCenterX = Width / 2.0f;
+				float ScreenCenterY = Height / 2.0f;
 				float radiusx = Aimbot::FOV * (ScreenCenterX / 100);
 				float radiusy = Aimbot::FOV * (ScreenCenterY / 100);
 				if (Aimbot::SquareFov) radiusy = radiusx;
@@ -746,7 +739,6 @@ int main(int, char**)
 					if (ESP::Box)
 					{
 						ImVec4 BoxCol;
-						// Team color based on model name
 						bool isCT = false;
 						if (i < (int)TargetModels.size())
 						{
@@ -764,20 +756,16 @@ int main(int, char**)
 						float bx = Draw.x - BoxWidth / 2.f;
 						float by = DrawHead.y;
 						if (ESP::BoxType == 0)
-							RenderRoundedRect(ImVec2(bx, by), ImVec2(bx + BoxWidth, by + BoxHeight), BoxCol, 2.f, ImDrawCornerFlags_All, ESP::BoxWidth, ESP::BoxRounding);
+							RenderRect(ImVec2(bx, by), ImVec2(bx + BoxWidth, by + BoxHeight), BoxCol, ESP::BoxRounding, ImDrawCornerFlags_All, ESP::BoxWidth);
 						else if (ESP::BoxType == 1)
 						{
 							float cornerLen = BoxHeight / 4.f;
-							// Top-left
 							RenderLine(ImVec2(bx, by), ImVec2(bx + cornerLen, by), BoxCol, ESP::BoxWidth);
 							RenderLine(ImVec2(bx, by), ImVec2(bx, by + cornerLen), BoxCol, ESP::BoxWidth);
-							// Top-right
 							RenderLine(ImVec2(bx + BoxWidth, by), ImVec2(bx + BoxWidth - cornerLen, by), BoxCol, ESP::BoxWidth);
 							RenderLine(ImVec2(bx + BoxWidth, by), ImVec2(bx + BoxWidth, by + cornerLen), BoxCol, ESP::BoxWidth);
-							// Bottom-left
 							RenderLine(ImVec2(bx, by + BoxHeight), ImVec2(bx + cornerLen, by + BoxHeight), BoxCol, ESP::BoxWidth);
 							RenderLine(ImVec2(bx, by + BoxHeight), ImVec2(bx, by + BoxHeight - cornerLen), BoxCol, ESP::BoxWidth);
-							// Bottom-right
 							RenderLine(ImVec2(bx + BoxWidth, by + BoxHeight), ImVec2(bx + BoxWidth - cornerLen, by + BoxHeight), BoxCol, ESP::BoxWidth);
 							RenderLine(ImVec2(bx + BoxWidth, by + BoxHeight), ImVec2(bx + BoxWidth, by + BoxHeight - cornerLen), BoxCol, ESP::BoxWidth);
 						}
@@ -788,18 +776,18 @@ int main(int, char**)
 						float dist = sqrt(pow(Targets[i].x - LocalPos.x, 2) + pow(Targets[i].y - LocalPos.y, 2) + pow(Targets[i].z - LocalPos.z, 2));
 						char distStr[32];
 						sprintf(distStr, "[%.0f]", dist);
-						RenderText(distStr, Draw.x, Draw.y + 5, ImVec4(ESP::DistColor[0], ESP::DistColor[1], ESP::DistColor[2], ESP::DistColor[3]), fontEsp);
+						RenderText(distStr, ImVec2(Draw.x, Draw.y + 5), 16.0f, ImVec4(ESP::DistColor[0], ESP::DistColor[1], ESP::DistColor[2], ESP::DistColor[3]), true, fontEsp);
 					}
 					if (ESP::Names && i < (int)TargetNames.size())
 					{
-						RenderText(TargetNames[i].c_str(), Draw.x, DrawHead.y - 15, ImVec4(ESP::NamesColor[0], ESP::NamesColor[1], ESP::NamesColor[2], ESP::NamesColor[3]), fontEsp);
+						RenderText(TargetNames[i].c_str(), ImVec2(Draw.x, DrawHead.y - 15), 16.0f, ImVec4(ESP::NamesColor[0], ESP::NamesColor[1], ESP::NamesColor[2], ESP::NamesColor[3]), true, fontEsp);
 					}
 				}
 				// Aimbot
 				if (BestTarget != -1 && Aimbot::Enabled && (GetAsyncKeyState(KEYS::AimbotKey1) || GetAsyncKeyState(KEYS::AimbotKey2)))
 				{
 					Vector3 aimTarget = Targets[BestTarget];
-					aimTarget.z += 72.f; // Head
+					aimTarget.z += 72.f;
 					Vector3 aimScreen = W2S(aimTarget);
 					float dx = aimScreen.x - ScreenCenterX;
 					float dy = aimScreen.y - ScreenCenterY;
