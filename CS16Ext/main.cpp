@@ -712,14 +712,18 @@ int main(int, char**)
                                         ImGui::SameLine();
                                         if (ImGui::Button(("EXPORT"), ImVec2(145, 25)))
                                         {
-                                                // Temporarily remove TOPMOST so dialog is visible
-                                                SetWindowPos(g_hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+                                                // Temporarily remove WS_EX_LAYERED and TOPMOST so dialog is visible
+                                                LONG oldExStyle = GetWindowLong(g_hwnd, GWL_EXSTYLE);
+                                                SetWindowLong(g_hwnd, GWL_EXSTYLE, oldExStyle & ~WS_EX_LAYERED);
+                                                SetWindowPos(g_hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED);
+                                                ShowWindow(g_hwnd, SW_HIDE);
+
                                                 OPENFILENAMEA ofn;
                                                 char szFile[260] = {0};
                                                 strcpy(szFile, "config.json");
                                                 ZeroMemory(&ofn, sizeof(ofn));
                                                 ofn.lStructSize = sizeof(ofn);
-                                                ofn.hwndOwner = g_hwnd;
+                                                ofn.hwndOwner = NULL;
                                                 ofn.lpstrFile = szFile;
                                                 ofn.nMaxFile = sizeof(szFile);
                                                 ofn.lpstrFilter = "JSON Files (*.json)\0*.json\0All Files (*.*)\0*.*\0";
@@ -732,20 +736,27 @@ int main(int, char**)
                                                         SaveConfig(std::string(szFile));
                                                         Beep(500, 100);
                                                 }
-                                                // Restore TOPMOST
-                                                SetWindowPos(g_hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+
+                                                // Restore original style
+                                                SetWindowLong(g_hwnd, GWL_EXSTYLE, oldExStyle);
+                                                SetWindowPos(g_hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED);
+                                                ShowWindow(g_hwnd, SW_SHOW);
                                         }
 
                                         ImGui::SameLine();
                                         if (ImGui::Button(("IMPORT"), ImVec2(145, 25)))
                                         {
-                                                // Temporarily remove TOPMOST so dialog is visible
-                                                SetWindowPos(g_hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+                                                // Temporarily remove WS_EX_LAYERED and TOPMOST so dialog is visible
+                                                LONG oldExStyle = GetWindowLong(g_hwnd, GWL_EXSTYLE);
+                                                SetWindowLong(g_hwnd, GWL_EXSTYLE, oldExStyle & ~WS_EX_LAYERED);
+                                                SetWindowPos(g_hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED);
+                                                ShowWindow(g_hwnd, SW_HIDE);
+
                                                 OPENFILENAMEA ofn;
                                                 char szFile[260] = {0};
                                                 ZeroMemory(&ofn, sizeof(ofn));
                                                 ofn.lStructSize = sizeof(ofn);
-                                                ofn.hwndOwner = g_hwnd;
+                                                ofn.hwndOwner = NULL;
                                                 ofn.lpstrFile = szFile;
                                                 ofn.nMaxFile = sizeof(szFile);
                                                 ofn.lpstrFilter = "JSON Files (*.json)\0*.json\0All Files (*.*)\0*.*\0";
@@ -758,8 +769,11 @@ int main(int, char**)
                                                         LoadConfig(std::string(szFile));
                                                         Beep(500, 100);
                                                 }
-                                                // Restore TOPMOST
-                                                SetWindowPos(g_hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+
+                                                // Restore original style
+                                                SetWindowLong(g_hwnd, GWL_EXSTYLE, oldExStyle);
+                                                SetWindowPos(g_hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED);
+                                                ShowWindow(g_hwnd, SW_SHOW);
                                         }
 
                                         if (ImGui::Button(("OPEN FOLDER"), ImVec2(225, 25)))
