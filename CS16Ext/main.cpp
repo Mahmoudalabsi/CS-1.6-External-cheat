@@ -712,7 +712,8 @@ int main(int, char**)
                                         ImGui::SameLine();
                                         if (ImGui::Button(("EXPORT"), ImVec2(145, 25)))
                                         {
-                                                SetForegroundWindow(g_hwnd);
+                                                // Temporarily remove TOPMOST so dialog is visible
+                                                SetWindowPos(g_hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
                                                 OPENFILENAMEA ofn;
                                                 char szFile[260] = {0};
                                                 strcpy(szFile, "config.json");
@@ -731,12 +732,15 @@ int main(int, char**)
                                                         SaveConfig(std::string(szFile));
                                                         Beep(500, 100);
                                                 }
+                                                // Restore TOPMOST
+                                                SetWindowPos(g_hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
                                         }
 
                                         ImGui::SameLine();
                                         if (ImGui::Button(("IMPORT"), ImVec2(145, 25)))
                                         {
-                                                SetForegroundWindow(g_hwnd);
+                                                // Temporarily remove TOPMOST so dialog is visible
+                                                SetWindowPos(g_hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
                                                 OPENFILENAMEA ofn;
                                                 char szFile[260] = {0};
                                                 ZeroMemory(&ofn, sizeof(ofn));
@@ -754,6 +758,8 @@ int main(int, char**)
                                                         LoadConfig(std::string(szFile));
                                                         Beep(500, 100);
                                                 }
+                                                // Restore TOPMOST
+                                                SetWindowPos(g_hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
                                         }
 
                                         if (ImGui::Button(("OPEN FOLDER"), ImVec2(225, 25)))
