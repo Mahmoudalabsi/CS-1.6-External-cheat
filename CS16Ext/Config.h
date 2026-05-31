@@ -23,10 +23,10 @@ public:
     void beginArray() { os << "["; first = true; }
     void endArray() { os << "]"; }
     void key(const std::string& k) { comma(); os << "\"" << k << "\":"; }
-    void valBool(bool v) { comma(); os << (v ? "true" : "false"); }
-    void valInt(int v) { comma(); os << v; }
-    void valFloat(float v) { comma(); os << v; }
-    void valDouble(double v) { comma(); os << v; }
+    void valBool(bool v) { os << (v ? "true" : "false"); }
+    void valInt(int v) { os << v; }
+    void valFloat(float v) { os << v; }
+    void valDouble(double v) { os << v; }
     std::string str() const { return os.str(); }
 };
 
