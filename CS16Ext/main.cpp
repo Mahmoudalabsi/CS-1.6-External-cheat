@@ -688,7 +688,7 @@ int main(int, char**)
                                                 if (strlen(cfgname) > 0)
                                                 {
                                                         std::string configDir = std::string(getenv("appdata")) + std::string(("\\INTERIUM\\CS16Ext\\"));
-                                                        SaveConfig(configDir + cfgname + ".ini");
+                                                        SaveConfig(configDir + cfgname + ".json");
                                                 }
                                         }
 
