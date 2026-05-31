@@ -712,32 +712,31 @@ int main(int, char**)
                                         ImGui::SameLine();
                                         if (ImGui::Button(("EXPORT"), ImVec2(145, 25)))
                                         {
-                                                for (int j = 0; j < 50; j++)
-                                                {
-                                                        if (IsConfigSelected[j])
-                                                        {
-                                                                // Export: copy config to Desktop as JSON
-                                                                std::string desktopDir = std::string(getenv("USERPROFILE")) + "\\Desktop\\";
-                                                                std::string srcPath = SettingsList[j];
-                                                                std::string fileName = srcPath.substr(srcPath.find_last_of("\\\\/") + 1);
-                                                                std::string dstPath = desktopDir + fileName;
+                                                SetForegroundWindow(g_hwnd);
+                                                OPENFILENAMEA ofn;
+                                                char szFile[260] = {0};
+                                                strcpy(szFile, "config.json");
+                                                ZeroMemory(&ofn, sizeof(ofn));
+                                                ofn.lStructSize = sizeof(ofn);
+                                                ofn.hwndOwner = g_hwnd;
+                                                ofn.lpstrFile = szFile;
+                                                ofn.nMaxFile = sizeof(szFile);
+                                                ofn.lpstrFilter = "JSON Files (*.json)\0*.json\0All Files (*.*)\0*.*\0";
+                                                ofn.nFilterIndex = 1;
+                                                ofn.lpstrDefExt = "json";
+                                                ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
 
-                                                                std::ifstream src(srcPath, std::ios::binary);
-                                                                std::ofstream dst(dstPath, std::ios::binary);
-                                                                dst << src.rdbuf();
-                                                                src.close();
-                                                                dst.close();
-                                                                Beep(500, 100);
-                                                        }
+                                                if (GetSaveFileNameA(&ofn))
+                                                {
+                                                        SaveConfig(std::string(szFile));
+                                                        Beep(500, 100);
                                                 }
                                         }
 
                                         ImGui::SameLine();
                                         if (ImGui::Button(("IMPORT"), ImVec2(145, 25)))
                                         {
-                                                // Bring our window to front for the dialog
                                                 SetForegroundWindow(g_hwnd);
-                                                // Import: open file dialog for .json
                                                 OPENFILENAMEA ofn;
                                                 char szFile[260] = {0};
                                                 ZeroMemory(&ofn, sizeof(ofn));
@@ -752,16 +751,7 @@ int main(int, char**)
 
                                                 if (GetOpenFileNameA(&ofn))
                                                 {
-                                                        std::string importPath = szFile;
-                                                        std::string configDir = std::string(getenv("appdata")) + "\\INTERIUM\\CS16Ext\\";
-                                                        std::string fileName = importPath.substr(importPath.find_last_of("\\\\/") + 1);
-                                                        std::string dstPath = configDir + fileName;
-
-                                                        std::ifstream src(importPath, std::ios::binary);
-                                                        std::ofstream dst(dstPath, std::ios::binary);
-                                                        dst << src.rdbuf();
-                                                        src.close();
-                                                        dst.close();
+                                                        LoadConfig(std::string(szFile));
                                                         Beep(500, 100);
                                                 }
                                         }
