@@ -8,6 +8,7 @@
 #include "Renderer.h"
 #include "Structs.h"
 #include "Offsets.h"
+#include <commdlg.h>
 
 MemoryManager* m;
 
@@ -734,12 +735,14 @@ int main(int, char**)
                                         ImGui::SameLine();
                                         if (ImGui::Button(("IMPORT"), ImVec2(145, 25)))
                                         {
+                                                // Bring our window to front for the dialog
+                                                SetForegroundWindow(g_hwnd);
                                                 // Import: open file dialog for .json
                                                 OPENFILENAMEA ofn;
                                                 char szFile[260] = {0};
                                                 ZeroMemory(&ofn, sizeof(ofn));
                                                 ofn.lStructSize = sizeof(ofn);
-                                                ofn.hwndOwner = NULL;
+                                                ofn.hwndOwner = g_hwnd;
                                                 ofn.lpstrFile = szFile;
                                                 ofn.nMaxFile = sizeof(szFile);
                                                 ofn.lpstrFilter = "JSON Files (*.json)\0*.json\0All Files (*.*)\0*.*\0";
