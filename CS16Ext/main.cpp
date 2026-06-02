@@ -19,7 +19,7 @@ bool lastAutoPistolState = 0;
 
 int WeaponID = 0;
 int PlayerTeam;
-View view;
+float gWorldToScreen[16];
 int InMenu;
 float fovscale1;
 float fovscale2;
@@ -85,22 +85,42 @@ static LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
         return DefWindowProc(hWnd, msg, wParam, lParam);
 }
 
+// ===== Evelion W2S Method =====
+// Uses 4x4 ViewMatrix from hw.dll (column-major)
+// ScreenTransform: multiply position by matrix -> NDC
+// WorldToScreen: check visibility -> map NDC to pixel coords
+
+bool ScreenTransform(Vector3 vPoint, float* vScreen)
+{
+        vScreen[0] = gWorldToScreen[0]  * vPoint.x + gWorldToScreen[4]  * vPoint.y + gWorldToScreen[8]  * vPoint.z + gWorldToScreen[12];
+        vScreen[1] = gWorldToScreen[1]  * vPoint.x + gWorldToScreen[5]  * vPoint.y + gWorldToScreen[9]  * vPoint.z + gWorldToScreen[13];
+        float w     = gWorldToScreen[3]  * vPoint.x + gWorldToScreen[7]  * vPoint.y + gWorldToScreen[11] * vPoint.z + gWorldToScreen[15];
+
+        if (w == 0.0f)
+        {
+                return (0.0f >= w);
+        }
+        else
+        {
+                float invW = 1.0f / w;
+                vScreen[0] *= invW;
+                vScreen[1] *= invW;
+                return (0.0f >= invW);  // true = behind camera
+        }
+}
+
 Vector3 W2S(Vector3 WorldPos)
 {
-        Vector3 screen = Vector3(0, 0, 0);
-        Vector3 vector = Vector3(0, 0, 0);
-        Vector3 LocalPlayerPos = Vector3(view.vOrigin.x, view.vOrigin.y, view.vOrigin.z - 12.f);
-        Vector3 worldLocation = WorldPos - LocalPlayerPos;
-        vector.x = worldLocation.Dot(view.vRight);
-        vector.y = worldLocation.Dot(view.vUpward);
-        vector.z = worldLocation.Dot(view.vForward);
-        if ((double)vector.z >= 0.01)
+        float vScreen[2] = { 0, 0 };
+        bool behind = ScreenTransform(WorldPos, vScreen);
+
+        if (!behind && vScreen[0] < 1.0f && vScreen[1] < 1.0f && vScreen[0] > -1.0f && vScreen[1] > -1.0f)
         {
-                screen.x = (float)(Width / 2) + (float)(Width / 2) / vector.z * fovscale1 * vector.x;
-                screen.y = (float)(Height / 2) - (float)(Height / 2) / vector.z * fovscale2 * vector.y;
-                return screen;
+                float screenX =  vScreen[0] * (Width  / 2.0f) + (Width  / 2.0f);
+                float screenY = -vScreen[1] * (Height / 2.0f) + (Height / 2.0f);
+                return Vector3(screenX, screenY, 0);
         }
-        else return Vector3(0, 0, 0);
+        return Vector3(0, 0, 0);
 }
 
 void Hack()
@@ -110,9 +130,10 @@ void Hack()
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 PlayerTeam = m->ReadMem<int>(m->cDll.base + Offsets::PlayerTeam);
                 InMenu = m->ReadMem<int>(m->eDll.base + Offsets::InMenu);
-                fovscale1 = m->ReadMem<float>(m->eDll.base + Offsets::fovscale1); //hw.dll+EC80E0
-                fovscale2 = m->ReadMem<float>(m->eDll.base + Offsets::fovscale2); //hw.dll+EC80F4
-                view = m->ReadMem<View>(m->cDll.base + Offsets::ViewMatrix);
+                fovscale1 = m->ReadMem<float>(m->eDll.base + Offsets::fovscale1); //hw.dll (backup)
+                fovscale2 = m->ReadMem<float>(m->eDll.base + Offsets::fovscale2); //hw.dll (backup)
+                // Read 4x4 ViewMatrix from hw.dll (Evelion method)
+                m->Read(m->eDll.base + Offsets::ViewMatrix, gWorldToScreen, sizeof(gWorldToScreen));
                 recoil = m->ReadMem<float>(m->eDll.base + Offsets::Recoil);
                 WeaponID = m->ReadMem<int>(m->eDll.base + Offsets::WeaponID);
 
@@ -126,7 +147,7 @@ void Hack()
                 {
                         float AnimState = m->ReadMem<float>(m->eDll.base + Offsets::AnimState + i * 592);
                         Anims.push_back(AnimState);
-                        Vector3 Posithion = m->ReadMem<Vector3>(m->eDll.base + Offsets::Posithion + i * 592); // 0x04A42A60
+                        Vector3 Posithion = m->ReadMem<Vector3>(m->eDll.base + Offsets::Posithion + i * 592);
                         Targets.push_back(Posithion);
                 }
 
@@ -137,8 +158,6 @@ void Hack()
                                 int OnGround = m->ReadMem<int>(m->eDll.base + Offsets::OnGround);
                                 if (OnGround == 1)
                                 {
-                                        //m->WriteMem<int>(m->cDll.base + Offsets::dwForceJump, 4);
-                                        //std::this_thread::sleep_for(std::chrono::milliseconds(5));
                                         m->WriteMem<int>(m->cDll.base + Offsets::dwForceJump, 5);
                                         std::this_thread::sleep_for(std::chrono::milliseconds(5));
                                         m->WriteMem<int>(m->cDll.base + Offsets::dwForceJump, 4);
@@ -208,7 +227,7 @@ void Hack()
                                 SetForegroundWindow(g_hwnd);
                                 mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
                                 std::this_thread::sleep_for(std::chrono::milliseconds(5));
-                                mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);    
+                                mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
                                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
                                 SetForegroundWindow(g_hwnd);
                                 mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
@@ -233,7 +252,7 @@ void Hack()
                         }
                         ShowMenu = !ShowMenu;
 
-                        while (GetAsyncKeyState(KEYS::MenuKey)) 
+                        while (GetAsyncKeyState(KEYS::MenuKey))
                         {
                                 if (!ShowMenu) SetForegroundWindow(g_hwnd);
                                 else SetForegroundWindow(GameHWND);
@@ -268,7 +287,7 @@ void Updater()
                         delete m;
                         Sleep(3000);
                         GameHWND = FindWindow("SDL_app", NULL);
-                        if (GameHWND) 
+                        if (GameHWND)
                         {
                                 InitCheat();
                                 DWORD PID = 0;
@@ -319,7 +338,7 @@ void Updater()
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
                 if (MISC::FpsUnlock)
-                { 
+                {
                         m->WriteMem<float>(m->eDll.base + Offsets::dwMaxFps, 999.f);
                         m->WriteMem<float>(m->eDll.base + Offsets::dwMaxFps + 104, 999.f);
                 }
@@ -342,7 +361,7 @@ int main(int, char**)
         wc.style = CS_VREDRAW | CS_HREDRAW;
         RegisterClassEx(&wc);
         g_hwnd = CreateWindowEx(WS_EX_TOPMOST | WS_EX_TRANSPARENT , WINNAME, WINNAME, WS_POPUP, 0, 0, Width, Height, 0, 0, 0, 0);
-        
+
         SetLayeredWindowAttributes(g_hwnd, 0, 255, LWA_ALPHA);
         SetLayeredWindowAttributes(g_hwnd, RGB(0, 0, 0), 0, ULW_COLORKEY);
         DwmExtendFrameIntoClientArea(g_hwnd, &MARGIN);
@@ -363,7 +382,7 @@ int main(int, char**)
         ImGuiIO& io = ImGui::GetIO(); (void)io;
         ImFont* youFontM = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\segoeui.ttf", 20.0f, NULL, io.Fonts->GetGlyphRangesCyrillic());
         ImFont* fontEsp = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\segoeuib.ttf", 16.0f, NULL, io.Fonts->GetGlyphRangesCyrillic());
-        
+
         ImGui_ImplWin32_Init(g_hwnd);
         ImGui_ImplDX9_Init(g_pd3dDevice);
 
@@ -398,7 +417,7 @@ int main(int, char**)
                         if (ShowMenu)
                         {
                                 ImGui::Begin("INTERIUM", &open, ImVec2(600, 480), 1.f, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-                                
+
                                 ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
                                 ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
                                 ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0);
@@ -415,7 +434,7 @@ int main(int, char**)
 
                                 ImGui::PopStyleVar(3);
                                 ImGui::NextColumn();
-                                
+
                                 if (Page == 0)
                                 {
                                         ImGui::Spacing(0, 5);
@@ -426,7 +445,7 @@ int main(int, char**)
                                         else  if (SelectedGroup == 1) ImGui::Combo(("Weapon"), &SelectedWeapon, ("MAC-10\0TMP\0MP-5\0UMP\0P-90\0"));
                                         else if (SelectedGroup == 2) ImGui::Combo(("Weapon"), &SelectedWeapon, ("Galil\0Famas\0AK-47\0M4A1\0Scout\0SG\0AUG\0AWP\0AUTO T\0AUTO CT\0"));
                                         else if (SelectedGroup == 3) ImGui::Combo(("Weapon"), &SelectedWeapon, ("NOVA\0XM-ATUO\0M249\0"));
-                                        
+
                                         if (SelectedGroup == 0 && SelectedWeapon == 0) SelectedWeaponID = 17;
                                         else if (SelectedGroup == 0 && SelectedWeapon == 1) SelectedWeaponID = 16;
                                         else if (SelectedGroup == 0 && SelectedWeapon == 2) SelectedWeaponID = 1;
@@ -455,11 +474,11 @@ int main(int, char**)
                                         else if (SelectedGroup == 3 && SelectedWeapon == 1) SelectedWeaponID = 5;
                                         else if (SelectedGroup == 3 && SelectedWeapon == 2) SelectedWeaponID = 20;
 
-                                        ImGui::SliderFloat(("FOV"), &Weapons[SelectedWeaponID].FOV, 0.f, 12.f);
-                                        ImGui::SliderFloat(("Smooth"), &Weapons[SelectedWeaponID].Smootch, 1.f, 12.f);
+                                        ImGui::SliderFloat(("FOV"), &Weapons[SelectedWeaponID].FOV, 0.f, 8.f);
+                                        ImGui::SliderFloat(("Smooth"), &Weapons[SelectedWeaponID].Smootch, 3.f, 20.f);
                                         ImGui::SliderFloat(("RCS"), &Weapons[SelectedWeaponID].RCS, 0.f, 12.f);
 
-                                        ImGui::Checkbox(("Square FOV"), &Aimbot::SquareFov);
+                                        ImGui::Checkbox(("Circle FOV"), &Aimbot::CircleFov);
 
                                         ImGui::Checkbox(("Draw FOV"), &Aimbot::DrawFov);
                                         ImGui::ColorEdit4(("FOV color"), Aimbot::DrawFovColor, ImGuiColorEditFlags_NoInputs);
@@ -468,7 +487,7 @@ int main(int, char**)
                                 else if (Page == 1)
                                 {
                                         ImGui::Spacing(0, 5);
-                                        ImGui::Checkbox(("Box"), &ESP::Box); 
+                                        ImGui::Checkbox(("Box"), &ESP::Box);
                                         ImGui::SameLine(); ImGui::Dummy(ImVec2(20, 0)); ImGui::SameLine();
                                         ImGui::PushItemWidth(120.f);
                                         ImGui::Combo(("Type"), &ESP::BoxType, ("Classic\0Corner\0"));
@@ -691,7 +710,8 @@ int main(int, char**)
                                 ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
                                 ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 0.0f, 0.0f });
                                 ImGui::PushStyleColor(ImGuiCol_WindowBg, { 0.0f, 0.0f, 0.0f, 0.0f });
-                                ImGui::Begin("##ESP", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoInputs);
+
+                                ImGui::Begin("Overlay", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoInputs);
 
                                 ImGui::SetWindowPos(ImVec2(0, 0), ImGuiCond_Once);
                                 ImGui::SetWindowSize(ImVec2(io.DisplaySize.x, io.DisplaySize.y), ImGuiCond_Once);
@@ -699,15 +719,18 @@ int main(int, char**)
                                 ImGui::Text("  INTERIUM.OOO");
                                 ImGui::Text(std::to_string(WeaponID).c_str());
                                 // ===== DEBUG INFO =====
-                                ImGui::Text("fovscale1: %.6f  (should be ~1.0)", fovscale1);
-                                ImGui::Text("fovscale2: %.6f  (should be ~1.333)", fovscale2);
-                                ImGui::Text("ViewForward: %.2f, %.2f, %.2f", view.vForward.x, view.vForward.y, view.vForward.z);
-                                ImGui::Text("ViewRight: %.2f, %.2f, %.2f", view.vRight.x, view.vRight.y, view.vRight.z);
-                                ImGui::Text("ViewUpward: %.2f, %.2f, %.2f", view.vUpward.x, view.vUpward.y, view.vUpward.z);
-                                ImGui::Text("ViewOrigin: %.1f, %.1f, %.1f", view.vOrigin.x, view.vOrigin.y, view.vOrigin.z);
-                                ImGui::Text("Recoil: %.4f", recoil);
-                                ImGui::Text("InMenu: %d", InMenu);
-                                ImGui::Text("PlayerTeam: %d", PlayerTeam);
+                                ImGui::Text("Screen: %d x %d", Width, Height);
+                                ImGui::Text("fovscale1: %.6f", fovscale1);
+                                ImGui::Text("fovscale2: %.6f", fovscale2);
+                                // ViewMatrix (4x4 from hw.dll, Evelion method)
+                                ImGui::Text("Matrix Row0: [%.3f, %.3f, %.3f, %.3f]", gWorldToScreen[0], gWorldToScreen[4], gWorldToScreen[8], gWorldToScreen[12]);
+                                ImGui::Text("Matrix Row1: [%.3f, %.3f, %.3f, %.3f]", gWorldToScreen[1], gWorldToScreen[5], gWorldToScreen[9], gWorldToScreen[13]);
+                                ImGui::Text("Matrix Row2: [%.3f, %.3f, %.3f, %.3f]", gWorldToScreen[2], gWorldToScreen[6], gWorldToScreen[10], gWorldToScreen[14]);
+                                ImGui::Text("Matrix Row3: [%.3f, %.3f, %.3f, %.3f]", gWorldToScreen[3], gWorldToScreen[7], gWorldToScreen[11], gWorldToScreen[15]);
+                                // Entity debug
+                                if (Targets.size() > 0 && Targets[0].x != 0)
+                                        ImGui::Text("Entity0 Pos: %.1f, %.1f, %.1f", Targets[0].x, Targets[0].y, Targets[0].z);
+                                ImGui::Text("Recoil: %.4f  InMenu: %d  Team: %d", recoil, InMenu, PlayerTeam);
                                 // ===== END DEBUG =====
                                 int BestTarget = -1;
                                 double ClosestPos = 9999999;
@@ -715,14 +738,15 @@ int main(int, char**)
                                 float ScreenCenterY = Height / 2;
                                 float radiusx = Aimbot::FOV * (ScreenCenterX / 100);
                                 float radiusy = Aimbot::FOV * (ScreenCenterY / 100);
-                                if (Aimbot::SquareFov) radiusy = radiusx;
+                                // CircleFov: always use equal radius for circle
+                                if (Aimbot::CircleFov) radiusy = radiusx;
 
                                 if (ESP::Crosshair)
                                 {
                                         RenderLine(ImVec2(Width / 2 - ESP::CrosshairSize, Height / 2), ImVec2(Width / 2 + ESP::CrosshairSize, Height / 2), ImVec4(ESP::CrosshairColor[0], ESP::CrosshairColor[1], ESP::CrosshairColor[2], ESP::CrosshairColor[3]), ESP::CrosshairWidth);
                                         RenderLine(ImVec2(Width / 2, Height / 2 - ESP::CrosshairSize), ImVec2(Width / 2, Height / 2 + ESP::CrosshairSize), ImVec4(ESP::CrosshairColor[0], ESP::CrosshairColor[1], ESP::CrosshairColor[2], ESP::CrosshairColor[3]), ESP::CrosshairWidth);
                                 }
-                                if (Aimbot::DrawFov) RenderRect(ImVec2(ScreenCenterX - radiusx, ScreenCenterY - radiusy), ImVec2(ScreenCenterX + radiusx, ScreenCenterY + radiusy), ImVec4(Aimbot::DrawFovColor[0], Aimbot::DrawFovColor[1], Aimbot::DrawFovColor[2], Aimbot::DrawFovColor[3]), 2.f, ImDrawCornerFlags_All, Aimbot::DrawFovWidth);
+                                if (Aimbot::DrawFov) RenderCircle(ImVec2(ScreenCenterX, ScreenCenterY), radiusx, ImVec4(Aimbot::DrawFovColor[0], Aimbot::DrawFovColor[1], Aimbot::DrawFovColor[2], Aimbot::DrawFovColor[3]), Aimbot::DrawFovWidth, 64);
                                 for (int i = 0; i < Targets.size(); i++)
                                 {
                                         if (Anims.size() < Targets.size()) Anims.push_back(0.f);
@@ -749,14 +773,13 @@ int main(int, char**)
                                                         }
                                                         if (HisTeam == PlayerTeam) continue;
                                                 }
-                                                //if (drawdot) RenderRectFilled(ImVec2(Draw.x - 2, Draw.y - 2), ImVec2(Draw.x + 2, Draw.y + 2), ImVec4(1.f, 0.f, 0.f, 1.f), 0, 0);// FillRGB(Draw.x - 2, Draw.y - 2, 4, 4, 255, 0, 0, 155);
 
                                                 Vector3 Draw2 = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z - 50.f));
                                                 int boxheight = (Draw2.y - Draw.y) * 1.25;
                                                 if (ESP::Box)
                                                 {
                                                         if(ESP::BoxType == 0)
-                                                        RenderRect(ImVec2(Draw2.x - boxheight / 4, Draw.y - boxheight * 0.25), ImVec2(Draw2.x + boxheight / 3.2, Draw.y + boxheight * 0.85), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxRounding, ImDrawCornerFlags_All, ESP::BoxWidth);// boxheight / 2, boxheight, 1, 255, 0, 0, 255);
+                                                        RenderRect(ImVec2(Draw2.x - boxheight / 4, Draw.y - boxheight * 0.25), ImVec2(Draw2.x + boxheight / 3.2, Draw.y + boxheight * 0.85), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxRounding, ImDrawCornerFlags_All, ESP::BoxWidth);
                                                         else
                                                         {
                                                                 float boxwidth = (Draw2.x - boxheight / 4) - (Draw2.x + boxheight / 3.2);
@@ -776,7 +799,7 @@ int main(int, char**)
                                                                 RenderLine(ImVec2(Draw2.x - boxheight / 4 - boxwidth, Draw.y - boxheight * 0.25 + boxheight), ImVec2(Draw2.x - boxheight / 4 - boxwidth + lineW, Draw.y - boxheight * 0.25 + boxheight), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
                                                         }
                                                 }
-                                                float dist = Targets[i].DistTo(view.vOrigin) * 0.254;
+                                                float dist = Targets[i].DistTo(Targets[0]) * 0.254;
                                                 if (ESP::Dist)
                                                 {
                                                         Vector3 Draw3 = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z - 55.f));
@@ -795,7 +818,7 @@ int main(int, char**)
 
                                                         if (Draw.x >= ScreenCenterX - radiusx && Draw.x <= ScreenCenterX + radiusx && Draw.y >= ScreenCenterY - radiusy && Draw.y <= ScreenCenterY + radiusy)
                                                         {
-                                                                if (CrosshairDistance < ClosestPos) 
+                                                                if (CrosshairDistance < ClosestPos)
                                                                 {
                                                                         ClosestPos = CrosshairDistance;
                                                                         BestTarget = i;

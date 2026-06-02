@@ -13,6 +13,7 @@ namespace Offsets
     const DWORD InMenu        = 0x6C3AB0;   // 1 when in menu
     const DWORD Recoil        = 0x122E324;  // recoil value
     const DWORD EntityList    = 0x12043C8;  // entity list base
+    const DWORD ViewMatrix    = 0xEC9780;   // 4x4 column-major view matrix (steam_legacy build 8684)
     const DWORD fovscale1     = 0xEC9E20;   // FOV scale X (~1.0)
     const DWORD fovscale2     = 0xEC9E34;   // FOV scale Y (~1.333)
     const DWORD WeaponID      = 0x108DD90;  // current weapon ID
@@ -24,7 +25,6 @@ namespace Offsets
     const DWORD PlayerTeam    = 0x100DF4;   // 1=CT, 2=T
     const DWORD OnLadder      = 0x136D8C;   // 1 on ladder, 0 on ground
     const DWORD InCross       = 0x125314;   // entity index under crosshair
-    const DWORD ViewMatrix    = 0x12EB10;   // Verified: sppy offset dump for build 8684
     const DWORD Model         = 0x1204748;  // entity 1 model
     const DWORD Name          = 0x120471C;  // entity 1 name
     const DWORD dwForceJump   = 0x131434;   // force jump command
