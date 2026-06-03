@@ -178,11 +178,5 @@ public:
         }
 };
 
-// ViewMatrix: 4x4 float matrix = 16 floats = 64 bytes
-// Read from hw.dll + ViewMatrix offset (Evelion method)
-// Column-major layout (OpenGL/GoldSrc style):
-//   [0]  [4]  [8]  [12]
-//   [1]  [5]  [9]  [13]
-//   [2]  [6]  [10] [14]
-//   [3]  [7]  [11] [15]
+// 4x4 World-to-Screen matrix (Evelion method - column-major, GoldSrc/OpenGL style)
 extern float gWorldToScreen[16];

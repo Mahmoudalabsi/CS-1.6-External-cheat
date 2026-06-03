@@ -49,13 +49,11 @@ bool triggerIsShooting = false;
 
 void InitCheat()
 {
-        // ===== MEMORY-ONLY: No config directory created, no files written =====
-        // Full cleanup of any leftover traces from previous versions
+        // NO disk directories created - memory-only config (Anti-Detect)
+        // Clean any old traces from previous versions
         FullSystemCleanup();
 
-        // Random startup delay (anti-detect: avoids timing patterns)
-        srand(GetTickCount());
-        Sleep(500 + (rand() % 2000));
+        Sleep(100);
         m = new MemoryManager;
         DWORD PID = 0;
         DWORD client = getModuleAddress(PID, "client.dll");
@@ -114,87 +112,11 @@ Vector3 W2S(Vector3 WorldPos)
         return Vector3(0, 0, 0);
 }
 
-// ===== Humanized Aim Movement (Anti-Detect) =====
-// Instead of instant mouse_event, we move in small steps with random jitter
-// This makes the movement look natural to anti-cheat mouse analysis
-static float g_AccumX = 0.f;
-static float g_AccumY = 0.f;
-
-void HumanizedMove(float TargetX, float TargetY)
-{
-        if (!Aimbot::HumanizeAim)
-        {
-                // Direct move (old method - detectable!)
-                mouse_event(MOUSEEVENTF_MOVE, (int)TargetX, (int)TargetY, NULL, NULL);
-                return;
-        }
-
-        // Human-like movement: split into micro-moves with jitter
-        float steps = max(1.f, Aimbot::Smooth / 2.f);
-        float stepX = TargetX / steps;
-        float stepY = TargetY / steps;
-
-        for (int s = 0; s < (int)steps; s++)
-        {
-                // Add random jitter (small random offset)
-                float jitterX = 0.f, jitterY = 0.f;
-                if (Aimbot::HumanizeJitter > 0.f)
-                {
-                        jitterX = ((rand() % 100) / 100.f - 0.5f) * Aimbot::HumanizeJitter * 2.f;
-                        jitterY = ((rand() % 100) / 100.f - 0.5f) * Aimbot::HumanizeJitter * 2.f;
-                }
-
-                float moveX = stepX + jitterX;
-                float moveY = stepY + jitterY;
-
-                // Accumulate sub-pixel movements
-                g_AccumX += moveX;
-                g_AccumY += moveY;
-
-                // Only send integer movements, keep fractional part
-                int sendX = (int)g_AccumX;
-                int sendY = (int)g_AccumY;
-                g_AccumX -= sendX;
-                g_AccumY -= sendY;
-
-                if (sendX != 0 || sendY != 0)
-                {
-                        mouse_event(MOUSEEVENTF_MOVE, sendX, sendY, NULL, NULL);
-                }
-
-                // Micro delay between steps
-                if (Aimbot::HumanizeDelay > 0.f)
-                        std::this_thread::sleep_for(std::chrono::microseconds((int)(Aimbot::HumanizeDelay * 1000)));
-        }
-}
-
-// ===== Anti-Screenshot Detection =====
-// WarGods takes screenshots of the game. We detect when a screenshot
-// is being taken (BitBlt/PrintWindow hook) and hide the overlay.
-static bool g_ScreenshotDetected = false;
-static DWORD g_LastFrameTime = 0;
-
-bool IsScreenshotBeingTaken()
-{
-        // Detect rapid frame capture (screenshot = multiple frames in <50ms)
-        DWORD now = GetTickCount();
-        DWORD delta = now - g_LastFrameTime;
-        g_LastFrameTime = now;
-        // If frames come too fast, might be a screenshot capture
-        // Normal game: 60-100fps = 10-16ms between frames
-        // Screenshot: <5ms between captures
-        return (delta < 3 && delta > 0);
-}
-
 void Hack()
 {
         while (true)
         {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
-
-                // Anti-Debug: if debugger attached, exit silently
-                if (IsDebuggerPresent()) exit(0);
-
                 PlayerTeam = m->ReadMem<int>(m->cDll.base + Offsets::PlayerTeam);
                 InMenu = m->ReadMem<int>(m->eDll.base + Offsets::InMenu);
                 m->Read(m->eDll.base + Offsets::ViewMatrix, gWorldToScreen, sizeof(gWorldToScreen));  // 4x4 matrix (Evelion method)
@@ -215,14 +137,7 @@ void Hack()
                         Targets.push_back(Posithion);
                 }
 
-                // Anti-detect: minimize FindWindow calls (WarGods hooks this API)
-                                static HWND cachedGameWnd = NULL;
-                                static DWORD lastFindTime = 0;
-                                if (GetTickCount() - lastFindTime > 5000) {
-                                        cachedGameWnd = FindWindow("SDL_app", NULL);
-                                        lastFindTime = GetTickCount();
-                                }
-                                if (GetForegroundWindow() == cachedGameWnd && !InMenu && !ShowMenu)
+                if (GetForegroundWindow() == FindWindow("SDL_app", NULL) && !InMenu && !ShowMenu)
                 {
                         if (MISC::Bhop && GetAsyncKeyState(KEYS::BhopKey))
                         {
@@ -423,14 +338,10 @@ DWORD currentTime = GetTickCount();
                         }
                 }
                 else if (GetAsyncKeyState(VK_END))
-                                {
-                                        // ===== Full cleanup before exit (NO traces left) =====
-                                        // Clear all memory configs (RAM only, nothing on disk)
-                                        g_MemoryConfigs.clear();
-                                        // Full system cleanup: prefetch, recent, temp, registry, thumbcache
-                                        FullSystemCleanup();
-                                        exit(1);
-                                }
+                {
+                        FullSystemCleanup();
+                        exit(1);
+                }
         }
 }
 
@@ -518,7 +429,6 @@ void Updater()
 
 int main(int, char**)
 {
-        RandomizeWindowName();  // Anti-detect: random window name
         WNDCLASSEX wc;
         wc.cbSize = sizeof(WNDCLASSEX);
         wc.cbClsExtra = NULL;
@@ -549,9 +459,13 @@ int main(int, char**)
         UpdateWindow(g_hwnd);
         SetWindowPos(g_hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 
+        // Randomize window name first (Anti-Detect)
+        RandomizeWindowName();
+
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
         ImGuiIO& io = ImGui::GetIO(); (void)io;
+        io.IniFilename = NULL;  // Prevent imgui.ini from being written to disk (Anti-Detect)
         ImFont* youFontM = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\segoeui.ttf", 20.0f, NULL, io.Fonts->GetGlyphRangesCyrillic());
         ImFont* fontEsp = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\segoeuib.ttf", 16.0f, NULL, io.Fonts->GetGlyphRangesCyrillic());
         
@@ -588,7 +502,7 @@ int main(int, char**)
 
                         if (ShowMenu)
                         {
-                                ImGui::Begin("Settings", &open, ImVec2(600, 480), 1.f, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+                                ImGui::Begin("INTERIUM", &open, ImVec2(600, 480), 1.f, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
                                 
                                 ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
                                 ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
@@ -660,16 +574,6 @@ int main(int, char**)
                                         ImGui::Spacing(0, 5);
                                         ImGui::SliderFloat(("Aim Height"), &Aimbot::AimOffset, 0.f, 30.f, ("Height: %.1f"));
                                         if (ImGui::IsItemHovered()) ImGui::SetTooltip(("0 = Feet  |  10 = Chest  |  18 = Neck  |  28 = Head"));
-
-                                        ImGui::Checkbox(("Humanize Aim"), &Aimbot::HumanizeAim);
-                                        if (ImGui::IsItemHovered()) ImGui::SetTooltip(("Makes mouse movement look human - harder for anti-cheat to detect"));
-                                        if (Aimbot::HumanizeAim)
-                                        {
-                                                ImGui::SliderFloat(("Jitter"), &Aimbot::HumanizeJitter, 0.f, 1.f, ("Jitter: %.2f"));
-                                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(("Random micro-movements. 0=None, 0.3=Subtle, 1=High"));
-                                                ImGui::SliderFloat(("Move Delay"), &Aimbot::HumanizeDelay, 0.f, 3.f, ("Delay: %.1fms"));
-                                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(("Micro-delay between moves. 0=Instant, 1=Fast, 3=Slow"));
-                                        }
                                 }
                                 else if (Page == 1)
                                 {
@@ -720,12 +624,12 @@ int main(int, char**)
                                                                 else if (Page == 3)
                                 {
                                         ImGui::Spacing(0, 5);
+                                        ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.f, 1.f), ("[ Memory-Only Configs - No Disk Traces ]"));
 
                                         ImGui::BeginChild(("##config"), ImVec2(457,300));
                                         RefreshSettings();
                                         for (int i = 0; i < SettingsList.size(); i++)
                                         {
-                                                // Memory configs: name is already clean (no path/extension)
                                                 std::string configname = SettingsList[i];
 
                                                 if (ImGui::Selectable(configname.c_str(), &IsConfigSelected[i]))
@@ -788,7 +692,6 @@ int main(int, char**)
                                         {
                                                 if (strlen(cfgname) > 0)
                                                 {
-                                                        // Save to memory only (no disk write)
                                                         SaveConfig(std::string(cfgname));
                                                 }
                                         }
@@ -818,15 +721,15 @@ int main(int, char**)
 
                                                 OPENFILENAMEA ofn;
                                                 char szFile[260] = {0};
-                                                strcpy(szFile, "config.dat");
+                                                strcpy(szFile, "config.json");
                                                 ZeroMemory(&ofn, sizeof(ofn));
                                                 ofn.lStructSize = sizeof(ofn);
                                                 ofn.hwndOwner = NULL;
                                                 ofn.lpstrFile = szFile;
                                                 ofn.nMaxFile = sizeof(szFile);
-                                                ofn.lpstrFilter = "Data Files (*.dat)\0*.dat\0All Files (*.*)\0*.*\0";
+                                                ofn.lpstrFilter = "JSON Files (*.json)\0*.json\0All Files (*.*)\0*.*\0";
                                                 ofn.nFilterIndex = 1;
-                                                ofn.lpstrDefExt = "dat";
+                                                ofn.lpstrDefExt = "json";
                                                 ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
 
                                                 if (GetSaveFileNameA(&ofn))
@@ -857,34 +760,19 @@ int main(int, char**)
                                                 ofn.hwndOwner = NULL;
                                                 ofn.lpstrFile = szFile;
                                                 ofn.nMaxFile = sizeof(szFile);
-                                                ofn.lpstrFilter = "Data Files (*.dat)\0*.dat\0JSON Files (*.json)\0*.json\0All Files (*.*)\0*.*\0";
+                                                ofn.lpstrFilter = "JSON Files (*.json)\0*.json\0All Files (*.*)\0*.*\0";
                                                 ofn.nFilterIndex = 1;
                                                 ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
-                                                ofn.lpstrDefExt = "dat";
+                                                ofn.lpstrDefExt = "json";
 
                                                 if (GetOpenFileNameA(&ofn))
                                                 {
-                                                        // Import to memory (read file, store in RAM, file still on disk)
-                                                        std::string filePath = szFile;
-                                                        std::string fileName = filePath;
-                                                        size_t lastSlash = fileName.find_last_of("\\/");
-                                                        if (lastSlash != std::string::npos) fileName = fileName.substr(lastSlash + 1);
-                                                        size_t lastDot = fileName.find_last_of(".");
-                                                        if (lastDot != std::string::npos) fileName = fileName.substr(0, lastDot);
-                                                        ImportConfigFromFile(filePath, fileName);
-                                                        // Apply the imported config
-                                                        LoadConfig(fileName);
-
-                                                        if (Keys[KEYS::MenuKey] != NULL) MenuKeyLabel = Keys[KEYS::MenuKey];
-                                                        else  MenuKeyLabel = ("unknown");
-                                                        if (Keys[KEYS::AimbotKey1] != NULL) AimbotKeyLabel = Keys[KEYS::AimbotKey1];
-                                                        else  AimbotKeyLabel = ("unknown");
-                                                        if (Keys[KEYS::AimbotKey2] != NULL) Aimbot2KeyLabel = Keys[KEYS::AimbotKey2];
-                                                        else  Aimbot2KeyLabel = ("unknown");
-                                                        if (Keys[KEYS::BhopKey] != NULL) BhopKeyLabel = Keys[KEYS::BhopKey];
-                                                        else  BhopKeyLabel = ("unknown");
-                                                        if (Keys[KEYS::DDrunKey] != NULL) DDrunKeyLabel = Keys[KEYS::DDrunKey];
-                                                        else  DDrunKeyLabel = ("unknown");
+                                                        std::string importName = std::string(szFile);
+                                                        size_t lastSlash = importName.find_last_of("\\/");
+                                                        if (lastSlash != std::string::npos) importName = importName.substr(lastSlash + 1);
+                                                        size_t lastDot = importName.find_last_of(".");
+                                                        if (lastDot != std::string::npos) importName = importName.substr(0, lastDot);
+                                                        ImportConfigFromFile(std::string(szFile), importName);
                                                         Beep(500, 100);
                                                 }
 
@@ -893,10 +781,6 @@ int main(int, char**)
                                                 SetWindowPos(g_hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED);
                                                 ShowWindow(g_hwnd, SW_SHOW);
                                         }
-
-                                        ImGui::Spacing(0, 5);
-                                        ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.f), "Memory-only mode: configs stored in RAM");
-                                        ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.f), "Use EXPORT/IMPORT to save/load from disk");
 
                                 }
                                 else if (Page == 4)
@@ -989,9 +873,6 @@ int main(int, char**)
                         {
                                 ImGuiIO& io = ImGui::GetIO();
 
-                                // Anti-Screenshot: check if screen capture is happening
-                                g_ScreenshotDetected = IsScreenshotBeingTaken();
-
                                 ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
                                 ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 0.0f, 0.0f });
                                 ImGui::PushStyleColor(ImGuiCol_WindowBg, { 0.0f, 0.0f, 0.0f, 0.0f });
@@ -1000,11 +881,17 @@ int main(int, char**)
                                 ImGui::SetWindowPos(ImVec2(0, 0), ImGuiCond_Once);
                                 ImGui::SetWindowSize(ImVec2(io.DisplaySize.x, io.DisplaySize.y), ImGuiCond_Once);
 
-                                ImGui::Text("  FPS: %.0f", io.Framerate);
-                                // Debug info hidden (anti-detect) - only show FPS
-                                // If screenshot detected, hide everything
-                                if (!g_ScreenshotDetected)
-                                        ImGui::Text("  FPS: %.0f", io.Framerate);
+                                ImGui::Text("  INTERIUM.OOO");
+                                ImGui::Text(std::to_string(WeaponID).c_str());
+                                // ===== DEBUG INFO (Evelion ViewMatrix) =====
+                                ImGui::Text("Matrix[0-3]:  %.3f, %.3f, %.3f, %.3f", gWorldToScreen[0], gWorldToScreen[1], gWorldToScreen[2], gWorldToScreen[3]);
+                                ImGui::Text("Matrix[4-7]:  %.3f, %.3f, %.3f, %.3f", gWorldToScreen[4], gWorldToScreen[5], gWorldToScreen[6], gWorldToScreen[7]);
+                                ImGui::Text("Matrix[8-11]: %.3f, %.3f, %.3f, %.3f", gWorldToScreen[8], gWorldToScreen[9], gWorldToScreen[10], gWorldToScreen[11]);
+                                ImGui::Text("Matrix[12-15]: %.3f, %.3f, %.3f, %.3f", gWorldToScreen[12], gWorldToScreen[13], gWorldToScreen[14], gWorldToScreen[15]);
+                                ImGui::Text("Recoil: %.4f", recoil);
+                                ImGui::Text("InMenu: %d", InMenu);
+                                ImGui::Text("PlayerTeam: %d", PlayerTeam);
+                                // ===== END DEBUG =====
                                 int BestTarget = -1;
                                 double ClosestPos = 9999999;
                                 float ScreenCenterX = Width / 2;
@@ -1018,7 +905,7 @@ int main(int, char**)
                                         RenderLine(ImVec2(Width / 2 - ESP::CrosshairSize, Height / 2), ImVec2(Width / 2 + ESP::CrosshairSize, Height / 2), ImVec4(ESP::CrosshairColor[0], ESP::CrosshairColor[1], ESP::CrosshairColor[2], ESP::CrosshairColor[3]), ESP::CrosshairWidth);
                                         RenderLine(ImVec2(Width / 2, Height / 2 - ESP::CrosshairSize), ImVec2(Width / 2, Height / 2 + ESP::CrosshairSize), ImVec4(ESP::CrosshairColor[0], ESP::CrosshairColor[1], ESP::CrosshairColor[2], ESP::CrosshairColor[3]), ESP::CrosshairWidth);
                                 }
-                                if (Aimbot::DrawFov && !g_ScreenshotDetected) RenderRect(ImVec2(ScreenCenterX - radiusx, ScreenCenterY - radiusy), ImVec2(ScreenCenterX + radiusx, ScreenCenterY + radiusy), ImVec4(Aimbot::DrawFovColor[0], Aimbot::DrawFovColor[1], Aimbot::DrawFovColor[2], Aimbot::DrawFovColor[3]), 2.f, ImDrawCornerFlags_All, Aimbot::DrawFovWidth);
+                                if (Aimbot::DrawFov) RenderRect(ImVec2(ScreenCenterX - radiusx, ScreenCenterY - radiusy), ImVec2(ScreenCenterX + radiusx, ScreenCenterY + radiusy), ImVec4(Aimbot::DrawFovColor[0], Aimbot::DrawFovColor[1], Aimbot::DrawFovColor[2], Aimbot::DrawFovColor[3]), 2.f, ImDrawCornerFlags_All, Aimbot::DrawFovWidth);
                                 for (int i = 0; i < Targets.size(); i++)
                                 {
                                         if (Anims.size() < Targets.size()) Anims.push_back(0.f);
@@ -1134,7 +1021,7 @@ int main(int, char**)
                                                 DistX /= Aimbot::Smooth;
                                                 DistY /= Aimbot::Smooth;
 
-                                                if (GetAsyncKeyState(KEYS::AimbotKey1) & 0x8000 || GetAsyncKeyState(KEYS::AimbotKey2) & 0x8000) HumanizedMove((float)DistX, (float)DistY);
+                                                if (GetAsyncKeyState(KEYS::AimbotKey1) & 0x8000 || GetAsyncKeyState(KEYS::AimbotKey2) & 0x8000) mouse_event(MOUSEEVENTF_MOVE, (int)DistX, (int)DistY, NULL, NULL);
                                         }
                                 }
 
@@ -1169,5 +1056,4 @@ int main(int, char**)
 
         return 0;
 }
-
 

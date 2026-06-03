@@ -23,6 +23,7 @@ static std::map<std::string, std::string> g_MemoryConfigs;
 // - Temp files
 // - Registry run/history entries
 // - Thumbnail cache
+// - Old INTERIUM config directory (from previous versions)
 // Called on startup (clean old traces) and on exit (clean current traces)
 inline void FullSystemCleanup()
 {
@@ -31,8 +32,6 @@ inline void FullSystemCleanup()
         char windowsDir[MAX_PATH];
 
         // 1. CLEAN PREFETCH - This is the main thing WarGods checks
-        // Prefetch stores .pf files for every executable that runs on Windows
-        // Location: C:\Windows\Prefetch\*.pf
         GetWindowsDirectory(windowsDir, MAX_PATH);
         std::string prefetchDir = std::string(windowsDir) + "\\Prefetch\\";
         {
@@ -42,9 +41,6 @@ inline void FullSystemCleanup()
                 if (hFind != INVALID_HANDLE_VALUE)
                 {
                         do {
-                                // Delete ALL .pf files in Prefetch folder
-                                // We can't know our exact .pf name since Windows hashes it
-                                // So we clean everything (safe: Windows rebuilds these automatically)
                                 std::string filePath = prefetchDir + findData.cFileName;
                                 DeleteFile(filePath.c_str());
                         } while (FindNextFile(hFind, &findData));
@@ -53,7 +49,6 @@ inline void FullSystemCleanup()
         }
 
         // 2. CLEAN RECENT FILES
-        // Location: %USERPROFILE%\Recent\*
         GetEnvironmentVariable("USERPROFILE", userProfile, MAX_PATH);
         {
                 std::string recentDir = std::string(userProfile) + "\\Recent\\";
@@ -74,7 +69,6 @@ inline void FullSystemCleanup()
         }
 
         // 3. CLEAN TEMP FILES
-        // Location: %TEMP%\* and C:\Windows\Temp\*
         {
                 char tempDir[MAX_PATH];
                 GetTempPath(MAX_PATH, tempDir);
@@ -111,7 +105,6 @@ inline void FullSystemCleanup()
         }
 
         // 4. CLEAN THUMBNAIL CACHE
-        // Location: %LOCALAPPDATA%\Microsoft\Windows\Explorer\thumbcache_*
         {
                 char localAppData[MAX_PATH];
                 GetEnvironmentVariable("LOCALAPPDATA", localAppData, MAX_PATH);
@@ -130,13 +123,12 @@ inline void FullSystemCleanup()
         }
 
         // 5. CLEAN OLD CONFIG TRACES (from previous versions that saved to disk)
-        // Location: %APPDATA%\Microsoft\Network\Connections\*.dat
         {
                 char appData[MAX_PATH];
                 GetEnvironmentVariable("APPDATA", appData, MAX_PATH);
-                std::string oldConfigDir = std::string(appData) + "\\Microsoft\\Network\\Connections\\";
+                std::string oldConfigDir = std::string(appData) + "\\INTERIUM\\CS16Ext\\";
                 WIN32_FIND_DATA findData;
-                std::string searchPath = oldConfigDir + "*.dat";
+                std::string searchPath = oldConfigDir + "*.json";
                 HANDLE hFind = FindFirstFile(searchPath.c_str(), &findData);
                 if (hFind != INVALID_HANDLE_VALUE)
                 {
@@ -146,21 +138,19 @@ inline void FullSystemCleanup()
                         } while (FindNextFile(hFind, &findData));
                         FindClose(hFind);
                 }
-                // Remove the directory itself if empty
+                // Remove the directories themselves if empty
                 RemoveDirectory(oldConfigDir.c_str());
+                std::string interiumDir = std::string(appData) + "\\INTERIUM\\";
+                RemoveDirectory(interiumDir.c_str());
         }
 
         // 6. CLEAR REGISTRY TRACES
-        // Clean MRU (Most Recently Used) lists that could reference the app
         {
-                // Clear Run dialog history
                 RegDeleteTreeA(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RunMRU");
-                // Clear typed paths history
                 RegDeleteTreeA(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\TypedPaths");
         }
 
         // 7. FLUSH SYSTEM CACHES
-        // Tell Windows to flush file system caches
         Sleep(100);
 }
 
@@ -190,6 +180,11 @@ class JsonReader {
         size_t b = s.find_last_not_of(" \t\r\n");
         if (a == std::string::npos) return "";
         return s.substr(a, b - a + 1);
+    }
+    static std::string unquote(const std::string& s) {
+        if (s.size() >= 2 && s.front() == '"' && s.back() == '"')
+            return s.substr(1, s.size() - 2);
+        return s;
     }
 public:
     bool parse(const std::string& json) {
@@ -308,9 +303,6 @@ static std::string BuildConfigJson()
         w.key("DrawFovColorA"); w.valFloat(Aimbot::DrawFovColor[3]);
         w.key("DrawFovWidth"); w.valFloat(Aimbot::DrawFovWidth);
         w.key("AimOffset"); w.valFloat(Aimbot::AimOffset);
-        w.key("HumanizeAim"); w.valBool(Aimbot::HumanizeAim);
-        w.key("HumanizeJitter"); w.valFloat(Aimbot::HumanizeJitter);
-        w.key("HumanizeDelay"); w.valFloat(Aimbot::HumanizeDelay);
         for (int i = 0; i < 40; i++)
         {
                 w.key("Weapon" + std::to_string(i) + "Enable"); w.valBool(Weapons[i].Enabled);
@@ -386,7 +378,7 @@ static bool ApplyConfigJson(const std::string& json)
         JsonReader r;
         if (!r.parse(json)) return false;
 
-        // AIMBOT - defaults match Settings.h
+        // AIMBOT - defaults from current values (preserves Settings.h defaults)
         Aimbot::Enabled = r.getBool("aimbot.Enabled", Aimbot::Enabled);
         Aimbot::Deathmatch = r.getBool("aimbot.Deathmatch", Aimbot::Deathmatch);
         Aimbot::SquareFov = r.getBool("aimbot.SquareFov", Aimbot::SquareFov);
@@ -397,9 +389,6 @@ static bool ApplyConfigJson(const std::string& json)
         Aimbot::DrawFovColor[3] = r.getFloat("aimbot.DrawFovColorA", Aimbot::DrawFovColor[3]);
         Aimbot::DrawFovWidth = r.getFloat("aimbot.DrawFovWidth", Aimbot::DrawFovWidth);
         Aimbot::AimOffset = r.getFloat("aimbot.AimOffset", Aimbot::AimOffset);
-        Aimbot::HumanizeAim = r.getBool("aimbot.HumanizeAim", Aimbot::HumanizeAim);
-        Aimbot::HumanizeJitter = r.getFloat("aimbot.HumanizeJitter", Aimbot::HumanizeJitter);
-        Aimbot::HumanizeDelay = r.getFloat("aimbot.HumanizeDelay", Aimbot::HumanizeDelay);
 
         for (int i = 0; i < 40; i++)
         {
@@ -409,7 +398,7 @@ static bool ApplyConfigJson(const std::string& json)
                 Weapons[i].RCS = r.getFloat("aimbot.Weapon" + std::to_string(i) + "RCS", Weapons[i].RCS);
         }
 
-        // ESP - defaults match Settings.h (CRITICAL: Box=true, BoxType=1, BoxSize=1.0)
+        // ESP - defaults from current values (Box=true, BoxType=0, BoxSize=1.0 from Settings.h)
         ESP::Box = r.getBool("esp.Box", ESP::Box);
         ESP::BoxType = r.getInt("esp.BoxType", ESP::BoxType);
         ESP::BoxColor[0] = r.getFloat("esp.BoxColorR", ESP::BoxColor[0]);
@@ -506,7 +495,6 @@ void DeleteConfig(std::string ConfigName)
 }
 
 // ===== ExportConfigToFile: USER-INITIATED, writes to disk =====
-// Only happens when user clicks EXPORT button and chooses a location
 void ExportConfigToFile(std::string FilePath)
 {
         std::ofstream ofs(FilePath);
@@ -526,7 +514,6 @@ void ExportConfigToFile(std::string FilePath)
 }
 
 // ===== ImportConfigFromFile: USER-INITIATED, reads from disk into RAM =====
-// Only happens when user clicks IMPORT button and chooses a file
 bool ImportConfigFromFile(std::string FilePath, std::string ConfigName)
 {
         std::ifstream ifs(FilePath);

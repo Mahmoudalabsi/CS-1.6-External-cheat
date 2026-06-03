@@ -11,22 +11,24 @@
 #include <chrono>
 #include <thread>
 #include <dwmapi.h>
-#include <stdlib.h>
 #define DIRECTINPUT_VERSION 0x0800
 
 static LPDIRECT3D9              g_pD3D = NULL;
 static LPDIRECT3DDEVICE9        g_pd3dDevice = NULL;
 static D3DPRESENT_PARAMETERS    g_d3dpp = {};
 static HWND g_hwnd = NULL;
-static char WINNAME[16] = " ";
+static char WINNAME[32] = " ";
 
-// Randomize the overlay window name (anti-detect: WarGods scans for known window titles)
+// ===== Randomize window name (Anti-Detect) =====
+// Changes the overlay window class name each run so WarGods
+// cannot find a consistent window title to flag
 inline void RandomizeWindowName()
 {
+        const char charset[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
         srand(GetTickCount());
         for (int i = 0; i < 15; i++)
         {
-                WINNAME[i] = (char)('a' + (rand() % 26));
+                WINNAME[i] = charset[rand() % (sizeof(charset) - 1)];
         }
         WINNAME[15] = '\0';
 }
@@ -98,3 +100,4 @@ static const char* Keys[] =
            "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE",
            "LSHIFT", "RSHIFT", "LCTRL", "RCTRL", "LALT", "RALT", "BACK", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE"
 };
+
