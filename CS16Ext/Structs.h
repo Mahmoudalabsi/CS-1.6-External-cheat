@@ -178,34 +178,11 @@ public:
         }
 };
 
-// 4x4 column-major view matrix at hw.dll+0xEC9780
-// Memory layout (column-major, 16 floats = 64 bytes):
-//   Col0 [offset  0]: m[0]=Rx,  m[1]=Ux,  m[2]=Fx,  m[3]=0
-//   Col1 [offset 16]: m[4]=Ry,  m[5]=Uy,  m[6]=Fy,  m[7]=0
-//   Col2 [offset 32]: m[8]=Rz,  m[9]=Uz,  m[10]=Fz, m[11]=0
-//   Col3 [offset 48]: m[12]=-R·eye, m[13]=-U·eye, m[14]=-F·eye, m[15]=1
-// Where R=Right, U=Up, F=Forward, eye=camera position
-//
-// To extract vectors:
-//   Right   = { m[0], m[4], m[8]  }
-//   Up      = { m[1], m[5], m[9]  }
-//   Forward = { m[2], m[6], m[10] }
-//   Origin  = { -(m[12]*m[0]+m[13]*m[1]+m[14]*m[2]),
-//               -(m[12]*m[4]+m[13]*m[5]+m[14]*m[6]),
-//               -(m[12]*m[8]+m[13]*m[9]+m[14]*m[10]) }
-struct ViewMatrix
-{
-        float m[16];
-
-        Vector3 GetRight()   const { return Vector3(m[0], m[4], m[8]);  }
-        Vector3 GetUp()      const { return Vector3(m[1], m[5], m[9]);  }
-        Vector3 GetForward() const { return Vector3(m[2], m[6], m[10]); }
-        Vector3 GetOrigin()  const
-        {
-                return Vector3(
-                        -(m[12] * m[0] + m[13] * m[1] + m[14] * m[2]),
-                        -(m[12] * m[4] + m[13] * m[5] + m[14] * m[6]),
-                        -(m[12] * m[8] + m[13] * m[9] + m[14] * m[10])
-                );
-        }
-};
+// ViewMatrix: 4x4 float matrix = 16 floats = 64 bytes
+// Read from hw.dll + ViewMatrix offset (Evelion method)
+// Column-major layout (OpenGL/GoldSrc style):
+//   [0]  [4]  [8]  [12]
+//   [1]  [5]  [9]  [13]
+//   [2]  [6]  [10] [14]
+//   [3]  [7]  [11] [15]
+extern float gWorldToScreen[16];

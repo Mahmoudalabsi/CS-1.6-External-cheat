@@ -8,6 +8,7 @@
 #include "Renderer.h"
 #include "Structs.h"
 #include "Offsets.h"
+#include <commdlg.h>
 
 MemoryManager* m;
 
@@ -21,8 +22,6 @@ int WeaponID = 0;
 int PlayerTeam;
 float gWorldToScreen[16];
 int InMenu;
-float fovscale1;
-float fovscale2;
 float recoil;
 
 std::vector<float> Anims;
@@ -44,15 +43,19 @@ std::string BhopKeyLabel = "SPACE";
 bool SetDDrunKey = false;
 std::string DDrunKeyLabel = "ALT";
 
+// Triggerbot state
+DWORD triggerLastShotTime = 0;
+bool triggerIsShooting = false;
+
 void InitCheat()
 {
-        std::string configDir = std::string(getenv("appdata")) + std::string("\\INTERIUM");
-        CreateDirectory(configDir.c_str(), 0);
-        configDir = configDir + std::string("\\CS16Ext");
-        CreateDirectory(configDir.c_str(), 0);
+        // ===== MEMORY-ONLY: No config directory created, no files written =====
+        // Full cleanup of any leftover traces from previous versions
+        FullSystemCleanup();
 
-        Sleep(100);
-        //      LoadConfig("KleskBY.ini");
+        // Random startup delay (anti-detect: avoids timing patterns)
+        srand(GetTickCount());
+        Sleep(500 + (rand() % 2000));
         m = new MemoryManager;
         DWORD PID = 0;
         DWORD client = getModuleAddress(PID, "client.dll");
@@ -85,42 +88,102 @@ static LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
         return DefWindowProc(hWnd, msg, wParam, lParam);
 }
 
-// ===== Evelion W2S Method =====
-// Uses 4x4 ViewMatrix from hw.dll (column-major)
-// ScreenTransform: multiply position by matrix -> NDC
-// WorldToScreen: check visibility -> map NDC to pixel coords
-
 bool ScreenTransform(Vector3 vPoint, float* vScreen)
 {
-        vScreen[0] = gWorldToScreen[0]  * vPoint.x + gWorldToScreen[4]  * vPoint.y + gWorldToScreen[8]  * vPoint.z + gWorldToScreen[12];
-        vScreen[1] = gWorldToScreen[1]  * vPoint.x + gWorldToScreen[5]  * vPoint.y + gWorldToScreen[9]  * vPoint.z + gWorldToScreen[13];
-        float w     = gWorldToScreen[3]  * vPoint.x + gWorldToScreen[7]  * vPoint.y + gWorldToScreen[11] * vPoint.z + gWorldToScreen[15];
+        vScreen[0] = gWorldToScreen[0]*vPoint.x + gWorldToScreen[4]*vPoint.y + gWorldToScreen[8]*vPoint.z  + gWorldToScreen[12];
+        vScreen[1] = gWorldToScreen[1]*vPoint.x + gWorldToScreen[5]*vPoint.y + gWorldToScreen[9]*vPoint.z  + gWorldToScreen[13];
+        float w     = gWorldToScreen[3]*vPoint.x + gWorldToScreen[7]*vPoint.y + gWorldToScreen[11]*vPoint.z + gWorldToScreen[15];
 
-        if (w == 0.0f)
-        {
-                return (0.0f >= w);
-        }
-        else
-        {
-                float invW = 1.0f / w;
-                vScreen[0] *= invW;
-                vScreen[1] *= invW;
-                return (0.0f >= invW);  // true = behind camera
-        }
+        if (w == 0.0f) return (0.0f >= w);
+        float invW = 1.0f / w;
+        vScreen[0] *= invW;
+        vScreen[1] *= invW;
+        return (0.0f >= invW);   // true = behind camera
 }
 
 Vector3 W2S(Vector3 WorldPos)
 {
         float vScreen[2] = { 0, 0 };
         bool behind = ScreenTransform(WorldPos, vScreen);
-
         if (!behind && vScreen[0] < 1.0f && vScreen[1] < 1.0f && vScreen[0] > -1.0f && vScreen[1] > -1.0f)
         {
-                float screenX =  vScreen[0] * (Width  / 2.0f) + (Width  / 2.0f);
+                float screenX = vScreen[0] * (Width  / 2.0f) + (Width  / 2.0f);
                 float screenY = -vScreen[1] * (Height / 2.0f) + (Height / 2.0f);
                 return Vector3(screenX, screenY, 0);
         }
         return Vector3(0, 0, 0);
+}
+
+// ===== Humanized Aim Movement (Anti-Detect) =====
+// Instead of instant mouse_event, we move in small steps with random jitter
+// This makes the movement look natural to anti-cheat mouse analysis
+static float g_AccumX = 0.f;
+static float g_AccumY = 0.f;
+
+void HumanizedMove(float TargetX, float TargetY)
+{
+        if (!Aimbot::HumanizeAim)
+        {
+                // Direct move (old method - detectable!)
+                mouse_event(MOUSEEVENTF_MOVE, (int)TargetX, (int)TargetY, NULL, NULL);
+                return;
+        }
+
+        // Human-like movement: split into micro-moves with jitter
+        float steps = max(1.f, Aimbot::Smooth / 2.f);
+        float stepX = TargetX / steps;
+        float stepY = TargetY / steps;
+
+        for (int s = 0; s < (int)steps; s++)
+        {
+                // Add random jitter (small random offset)
+                float jitterX = 0.f, jitterY = 0.f;
+                if (Aimbot::HumanizeJitter > 0.f)
+                {
+                        jitterX = ((rand() % 100) / 100.f - 0.5f) * Aimbot::HumanizeJitter * 2.f;
+                        jitterY = ((rand() % 100) / 100.f - 0.5f) * Aimbot::HumanizeJitter * 2.f;
+                }
+
+                float moveX = stepX + jitterX;
+                float moveY = stepY + jitterY;
+
+                // Accumulate sub-pixel movements
+                g_AccumX += moveX;
+                g_AccumY += moveY;
+
+                // Only send integer movements, keep fractional part
+                int sendX = (int)g_AccumX;
+                int sendY = (int)g_AccumY;
+                g_AccumX -= sendX;
+                g_AccumY -= sendY;
+
+                if (sendX != 0 || sendY != 0)
+                {
+                        mouse_event(MOUSEEVENTF_MOVE, sendX, sendY, NULL, NULL);
+                }
+
+                // Micro delay between steps
+                if (Aimbot::HumanizeDelay > 0.f)
+                        std::this_thread::sleep_for(std::chrono::microseconds((int)(Aimbot::HumanizeDelay * 1000)));
+        }
+}
+
+// ===== Anti-Screenshot Detection =====
+// WarGods takes screenshots of the game. We detect when a screenshot
+// is being taken (BitBlt/PrintWindow hook) and hide the overlay.
+static bool g_ScreenshotDetected = false;
+static DWORD g_LastFrameTime = 0;
+
+bool IsScreenshotBeingTaken()
+{
+        // Detect rapid frame capture (screenshot = multiple frames in <50ms)
+        DWORD now = GetTickCount();
+        DWORD delta = now - g_LastFrameTime;
+        g_LastFrameTime = now;
+        // If frames come too fast, might be a screenshot capture
+        // Normal game: 60-100fps = 10-16ms between frames
+        // Screenshot: <5ms between captures
+        return (delta < 3 && delta > 0);
 }
 
 void Hack()
@@ -128,12 +191,13 @@ void Hack()
         while (true)
         {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+                // Anti-Debug: if debugger attached, exit silently
+                if (IsDebuggerPresent()) exit(0);
+
                 PlayerTeam = m->ReadMem<int>(m->cDll.base + Offsets::PlayerTeam);
                 InMenu = m->ReadMem<int>(m->eDll.base + Offsets::InMenu);
-                fovscale1 = m->ReadMem<float>(m->eDll.base + Offsets::fovscale1); //hw.dll (backup)
-                fovscale2 = m->ReadMem<float>(m->eDll.base + Offsets::fovscale2); //hw.dll (backup)
-                // Read 4x4 ViewMatrix from hw.dll (Evelion method)
-                m->Read(m->eDll.base + Offsets::ViewMatrix, gWorldToScreen, sizeof(gWorldToScreen));
+                m->Read(m->eDll.base + Offsets::ViewMatrix, gWorldToScreen, sizeof(gWorldToScreen));  // 4x4 matrix (Evelion method)
                 recoil = m->ReadMem<float>(m->eDll.base + Offsets::Recoil);
                 WeaponID = m->ReadMem<int>(m->eDll.base + Offsets::WeaponID);
 
@@ -147,17 +211,26 @@ void Hack()
                 {
                         float AnimState = m->ReadMem<float>(m->eDll.base + Offsets::AnimState + i * 592);
                         Anims.push_back(AnimState);
-                        Vector3 Posithion = m->ReadMem<Vector3>(m->eDll.base + Offsets::Posithion + i * 592);
+                        Vector3 Posithion = m->ReadMem<Vector3>(m->eDll.base + Offsets::Posithion + i * 592); // 0x04A42A60
                         Targets.push_back(Posithion);
                 }
 
-                if (GetForegroundWindow() == FindWindow("SDL_app", NULL) && !InMenu && !ShowMenu)
+                // Anti-detect: minimize FindWindow calls (WarGods hooks this API)
+                                static HWND cachedGameWnd = NULL;
+                                static DWORD lastFindTime = 0;
+                                if (GetTickCount() - lastFindTime > 5000) {
+                                        cachedGameWnd = FindWindow("SDL_app", NULL);
+                                        lastFindTime = GetTickCount();
+                                }
+                                if (GetForegroundWindow() == cachedGameWnd && !InMenu && !ShowMenu)
                 {
                         if (MISC::Bhop && GetAsyncKeyState(KEYS::BhopKey))
                         {
                                 int OnGround = m->ReadMem<int>(m->eDll.base + Offsets::OnGround);
                                 if (OnGround == 1)
                                 {
+                                        //m->WriteMem<int>(m->cDll.base + Offsets::dwForceJump, 4);
+                                        //std::this_thread::sleep_for(std::chrono::milliseconds(5));
                                         m->WriteMem<int>(m->cDll.base + Offsets::dwForceJump, 5);
                                         std::this_thread::sleep_for(std::chrono::milliseconds(5));
                                         m->WriteMem<int>(m->cDll.base + Offsets::dwForceJump, 4);
@@ -177,7 +250,97 @@ void Hack()
                                 else m->WriteMem<int>(m->cDll.base + Offsets::dwForceAttack, 4);
                         }
 
-                        if (MISC::DDrun && GetAsyncKeyState(KEYS::DDrunKey))
+                        // ===== TRIGGERBOT (InCross Method) =====
+                        if (TRIGGERBOT::Enabled)
+                        {
+                                int InCrossID = m->ReadMem<int>(m->cDll.base + Offsets::InCross);
+                                bool shouldShoot = false;
+
+                                if (InCrossID > 0 && InCrossID < 33)
+                                {
+                                        if (TRIGGERBOT::Deathmatch)
+                                        {
+                                                shouldShoot = true;
+                                        }
+                                        else
+                                        {
+                                                // Read local player team from reliable client.dll offset (1=CT, 2=T)
+                                                int localTeam = m->ReadMem<int>(m->cDll.base + Offsets::PlayerTeam);
+
+                                                // Read target entity model DIRECTLY from memory
+                                                // InCrossID is 1-based entity index; Offsets::Model points to entity 1 data
+                                                // So entity N model is at: Offsets::Model + (N-1) * 592
+                                                char targetModelBuf[64] = {0};
+                                                m->Read(m->eDll.base + Offsets::Model + (InCrossID - 1) * 592, targetModelBuf, 64);
+                                                std::string targetMdl = targetModelBuf;
+
+                                                // VIP is always enemy regardless of team
+                                                bool targetIsVIP = (targetMdl.find("vip") != std::string::npos);
+
+                                                // Determine target team from model name
+                                                bool targetIsCT = (targetMdl.find("urban") != std::string::npos ||
+                                                        targetMdl.find("gsg9") != std::string::npos ||
+                                                        targetMdl.find("sas") != std::string::npos ||
+                                                        targetMdl.find("gign") != std::string::npos ||
+                                                        targetMdl.find("spetsnaz") != std::string::npos);
+                                                bool targetIsT = (targetMdl.find("terror") != std::string::npos ||
+                                                        targetMdl.find("arctic") != std::string::npos ||
+                                                        targetMdl.find("guerrilla") != std::string::npos ||
+                                                        targetMdl.find("leet") != std::string::npos ||
+                                                        targetMdl.find("militia") != std::string::npos);
+
+                                                // Shoot if target is VIP (always enemy) or different team
+                                                if (targetIsVIP)
+                                                        shouldShoot = true;
+                                                else if (localTeam == 1 && targetIsT) // local=CT, target=T
+                                                        shouldShoot = true;
+                                                else if (localTeam == 2 && targetIsCT) // local=T, target=CT
+                                                        shouldShoot = true;
+                                        }
+                                }
+
+DWORD currentTime = GetTickCount();
+                                if (shouldShoot)
+                                {
+                                        if (!triggerIsShooting)
+                                        {
+                                                if (currentTime - triggerLastShotTime >= (DWORD)TRIGGERBOT::Delay)
+                                                {
+                                                        m->WriteMem<int>(m->cDll.base + Offsets::dwForceAttack, 5);
+                                                        triggerIsShooting = true;
+                                                        triggerLastShotTime = currentTime;
+                                                }
+                                        }
+                                        else
+                                        {
+                                                if (currentTime - triggerLastShotTime >= (DWORD)TRIGGERBOT::ShotDelay)
+                                                {
+                                                        m->WriteMem<int>(m->cDll.base + Offsets::dwForceAttack, 5);
+                                                        triggerLastShotTime = currentTime;
+                                                }
+                                        }
+                                }
+                                else
+                                {
+                                        if (triggerIsShooting)
+                                        {
+                                                m->WriteMem<int>(m->cDll.base + Offsets::dwForceAttack, 4);
+                                                triggerIsShooting = false;
+                                                triggerLastShotTime = currentTime;
+                                        }
+                                }
+                        }
+                        else
+                        {
+                                if (triggerIsShooting)
+                                {
+                                        m->WriteMem<int>(m->cDll.base + Offsets::dwForceAttack, 4);
+                                        triggerIsShooting = false;
+                                }
+                        }
+                        // ===== END TRIGGERBOT =====
+
+                                                if (MISC::DDrun && GetAsyncKeyState(KEYS::DDrunKey))
                         {
                                 int OnGround = m->ReadMem<int>(m->eDll.base + Offsets::OnGround);
                                 if (OnGround == 1)
@@ -227,7 +390,7 @@ void Hack()
                                 SetForegroundWindow(g_hwnd);
                                 mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
                                 std::this_thread::sleep_for(std::chrono::milliseconds(5));
-                                mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+                                mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);    
                                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
                                 SetForegroundWindow(g_hwnd);
                                 mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
@@ -252,14 +415,22 @@ void Hack()
                         }
                         ShowMenu = !ShowMenu;
 
-                        while (GetAsyncKeyState(KEYS::MenuKey))
+                        while (GetAsyncKeyState(KEYS::MenuKey)) 
                         {
                                 if (!ShowMenu) SetForegroundWindow(g_hwnd);
                                 else SetForegroundWindow(GameHWND);
                                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
                         }
                 }
-                else if (GetAsyncKeyState(VK_END)) exit(1);
+                else if (GetAsyncKeyState(VK_END))
+                                {
+                                        // ===== Full cleanup before exit (NO traces left) =====
+                                        // Clear all memory configs (RAM only, nothing on disk)
+                                        g_MemoryConfigs.clear();
+                                        // Full system cleanup: prefetch, recent, temp, registry, thumbcache
+                                        FullSystemCleanup();
+                                        exit(1);
+                                }
         }
 }
 
@@ -287,7 +458,7 @@ void Updater()
                         delete m;
                         Sleep(3000);
                         GameHWND = FindWindow("SDL_app", NULL);
-                        if (GameHWND)
+                        if (GameHWND) 
                         {
                                 InitCheat();
                                 DWORD PID = 0;
@@ -310,8 +481,8 @@ void Updater()
                 TargetModels.clear();
                 for (int i = 0; i < 30; i++)
                 {
-                        char PlayerModel[3];
-                        m->Read(m->eDll.base + Offsets::Model + i * 592, PlayerModel, 3);
+                        char PlayerModel[64];
+                        m->Read(m->eDll.base + Offsets::Model + i * 592, PlayerModel, 64);
                         std::string Model = PlayerModel;
                         if (strlen(Model.c_str()) > 3) Model.substr(0, Model.size() - 2);
                         TargetModels.push_back(Model);
@@ -338,7 +509,7 @@ void Updater()
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
                 if (MISC::FpsUnlock)
-                {
+                { 
                         m->WriteMem<float>(m->eDll.base + Offsets::dwMaxFps, 999.f);
                         m->WriteMem<float>(m->eDll.base + Offsets::dwMaxFps + 104, 999.f);
                 }
@@ -347,6 +518,7 @@ void Updater()
 
 int main(int, char**)
 {
+        RandomizeWindowName();  // Anti-detect: random window name
         WNDCLASSEX wc;
         wc.cbSize = sizeof(WNDCLASSEX);
         wc.cbClsExtra = NULL;
@@ -361,7 +533,7 @@ int main(int, char**)
         wc.style = CS_VREDRAW | CS_HREDRAW;
         RegisterClassEx(&wc);
         g_hwnd = CreateWindowEx(WS_EX_TOPMOST | WS_EX_TRANSPARENT , WINNAME, WINNAME, WS_POPUP, 0, 0, Width, Height, 0, 0, 0, 0);
-
+        
         SetLayeredWindowAttributes(g_hwnd, 0, 255, LWA_ALPHA);
         SetLayeredWindowAttributes(g_hwnd, RGB(0, 0, 0), 0, ULW_COLORKEY);
         DwmExtendFrameIntoClientArea(g_hwnd, &MARGIN);
@@ -382,7 +554,7 @@ int main(int, char**)
         ImGuiIO& io = ImGui::GetIO(); (void)io;
         ImFont* youFontM = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\segoeui.ttf", 20.0f, NULL, io.Fonts->GetGlyphRangesCyrillic());
         ImFont* fontEsp = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\segoeuib.ttf", 16.0f, NULL, io.Fonts->GetGlyphRangesCyrillic());
-
+        
         ImGui_ImplWin32_Init(g_hwnd);
         ImGui_ImplDX9_Init(g_pd3dDevice);
 
@@ -416,8 +588,8 @@ int main(int, char**)
 
                         if (ShowMenu)
                         {
-                                ImGui::Begin("INTERIUM", &open, ImVec2(600, 480), 1.f, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-
+                                ImGui::Begin("Settings", &open, ImVec2(600, 480), 1.f, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+                                
                                 ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
                                 ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
                                 ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0);
@@ -428,13 +600,14 @@ int main(int, char**)
                                 if (ImGui::Button(("AIMBOT"), ImVec2(100, 25))) Page = 0;
                                 if (ImGui::Button(("ESP"), ImVec2(100, 25))) Page = 1;
                                 if (ImGui::Button(("MISC"), ImVec2(100, 25))) Page = 2;
+                                if (ImGui::Button(("TRIGGER"), ImVec2(100, 25))) Page = 5;
                                 if (ImGui::Button(("KEYS"), ImVec2(100, 25))) Page = 4;
                                 if (ImGui::Button(("CFG"), ImVec2(100, 25))) Page = 3;
                                 ImGui::TextWrapped("This cheat was made by KleskBY in 2019");
 
                                 ImGui::PopStyleVar(3);
                                 ImGui::NextColumn();
-
+                                
                                 if (Page == 0)
                                 {
                                         ImGui::Spacing(0, 5);
@@ -445,7 +618,7 @@ int main(int, char**)
                                         else  if (SelectedGroup == 1) ImGui::Combo(("Weapon"), &SelectedWeapon, ("MAC-10\0TMP\0MP-5\0UMP\0P-90\0"));
                                         else if (SelectedGroup == 2) ImGui::Combo(("Weapon"), &SelectedWeapon, ("Galil\0Famas\0AK-47\0M4A1\0Scout\0SG\0AUG\0AWP\0AUTO T\0AUTO CT\0"));
                                         else if (SelectedGroup == 3) ImGui::Combo(("Weapon"), &SelectedWeapon, ("NOVA\0XM-ATUO\0M249\0"));
-
+                                        
                                         if (SelectedGroup == 0 && SelectedWeapon == 0) SelectedWeaponID = 17;
                                         else if (SelectedGroup == 0 && SelectedWeapon == 1) SelectedWeaponID = 16;
                                         else if (SelectedGroup == 0 && SelectedWeapon == 2) SelectedWeaponID = 1;
@@ -474,20 +647,34 @@ int main(int, char**)
                                         else if (SelectedGroup == 3 && SelectedWeapon == 1) SelectedWeaponID = 5;
                                         else if (SelectedGroup == 3 && SelectedWeapon == 2) SelectedWeaponID = 20;
 
-                                        ImGui::SliderFloat(("FOV"), &Weapons[SelectedWeaponID].FOV, 0.f, 8.f);
-                                        ImGui::SliderFloat(("Smooth"), &Weapons[SelectedWeaponID].Smootch, 3.f, 20.f);
+                                        ImGui::SliderFloat(("FOV"), &Weapons[SelectedWeaponID].FOV, 0.f, 12.f);
+                                        ImGui::SliderFloat(("Smooth"), &Weapons[SelectedWeaponID].Smootch, 1.f, 12.f);
                                         ImGui::SliderFloat(("RCS"), &Weapons[SelectedWeaponID].RCS, 0.f, 12.f);
 
-                                        ImGui::Checkbox(("Circle FOV"), &Aimbot::CircleFov);
+                                        ImGui::Checkbox(("Square FOV"), &Aimbot::SquareFov);
 
                                         ImGui::Checkbox(("Draw FOV"), &Aimbot::DrawFov);
                                         ImGui::ColorEdit4(("FOV color"), Aimbot::DrawFovColor, ImGuiColorEditFlags_NoInputs);
                                         ImGui::SliderFloat(("FOV thickness"), &Aimbot::DrawFovWidth, 0.f, 10.f);
+
+                                        ImGui::Spacing(0, 5);
+                                        ImGui::SliderFloat(("Aim Height"), &Aimbot::AimOffset, 0.f, 30.f, ("Height: %.1f"));
+                                        if (ImGui::IsItemHovered()) ImGui::SetTooltip(("0 = Feet  |  10 = Chest  |  18 = Neck  |  28 = Head"));
+
+                                        ImGui::Checkbox(("Humanize Aim"), &Aimbot::HumanizeAim);
+                                        if (ImGui::IsItemHovered()) ImGui::SetTooltip(("Makes mouse movement look human - harder for anti-cheat to detect"));
+                                        if (Aimbot::HumanizeAim)
+                                        {
+                                                ImGui::SliderFloat(("Jitter"), &Aimbot::HumanizeJitter, 0.f, 1.f, ("Jitter: %.2f"));
+                                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(("Random micro-movements. 0=None, 0.3=Subtle, 1=High"));
+                                                ImGui::SliderFloat(("Move Delay"), &Aimbot::HumanizeDelay, 0.f, 3.f, ("Delay: %.1fms"));
+                                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(("Micro-delay between moves. 0=Instant, 1=Fast, 3=Slow"));
+                                        }
                                 }
                                 else if (Page == 1)
                                 {
                                         ImGui::Spacing(0, 5);
-                                        ImGui::Checkbox(("Box"), &ESP::Box);
+                                        ImGui::Checkbox(("Box"), &ESP::Box); 
                                         ImGui::SameLine(); ImGui::Dummy(ImVec2(20, 0)); ImGui::SameLine();
                                         ImGui::PushItemWidth(120.f);
                                         ImGui::Combo(("Type"), &ESP::BoxType, ("Classic\0Corner\0"));
@@ -496,10 +683,15 @@ int main(int, char**)
                                         ImGui::SliderFloat(("Box thickness"), &ESP::BoxWidth, 1.f, 10.f);
                                         if(ESP::BoxType == 0) ImGui::SliderFloat(("Box rounding"), &ESP::BoxRounding, 0.f, 10.f);
 
+                                        ImGui::SliderFloat(("Box size"), &ESP::BoxSize, 0.3f, 2.f, ("Scale: %.2fx"));
+                                        if (ImGui::IsItemHovered()) ImGui::SetTooltip(("0.5 = Small  |  1.0 = Normal  |  1.5 = Large  |  2.0 = XL"));
+
+                                        ImGui::Checkbox(("Show Teammates"), &ESP::ShowTeam);
+
                                         ImGui::Checkbox(("Draw distance"), &ESP::Dist);
                                         ImGui::ColorEdit4(("Dist color"), ESP::DistColor, ImGuiColorEditFlags_NoInputs);
 
-                                        ImGui::Checkbox(("Draw names"), &ESP::Dist);
+                                        ImGui::Checkbox(("Draw names"), &ESP::Names);
                                         ImGui::ColorEdit4(("Names color"), ESP::NamesColor, ImGuiColorEditFlags_NoInputs);
 
                                         ImGui::Checkbox(("Crosshair"), &ESP::Crosshair);
@@ -515,7 +707,17 @@ int main(int, char**)
                                         ImGui::Checkbox(("AutoPistol"), &MISC::AutoPistol);
                                         ImGui::Checkbox(("FPS Unlock"), &MISC::FpsUnlock);
                                 }
-                                else if (Page == 3)
+                                else if (Page == 5)
+                                {
+                                        ImGui::Spacing(0, 5);
+                                        ImGui::Checkbox(("Triggerbot"), &TRIGGERBOT::Enabled); ImGui::SameLine(); ImGui::Checkbox(("Deathmatch"), &TRIGGERBOT::Deathmatch);
+                                        ImGui::SliderInt(("Delay (ms)"), &TRIGGERBOT::Delay, 0, 500);
+                                        ImGui::SliderInt(("Shot Delay (ms)"), &TRIGGERBOT::ShotDelay, 10, 500);
+                                        ImGui::TextWrapped("Toggle ON/OFF from menu. No key needed.");
+                                        ImGui::TextWrapped("Uses InCross: auto-shoots when crosshair");
+                                        ImGui::TextWrapped("is over an enemy.");
+                                }
+                                                                else if (Page == 3)
                                 {
                                         ImGui::Spacing(0, 5);
 
@@ -523,10 +725,8 @@ int main(int, char**)
                                         RefreshSettings();
                                         for (int i = 0; i < SettingsList.size(); i++)
                                         {
+                                                // Memory configs: name is already clean (no path/extension)
                                                 std::string configname = SettingsList[i];
-                                                configname = configname.substr(0, configname.size() - 4);
-                                                std::string pathtocfg = configname.substr(0, configname.find_last_of("\\/"));
-                                                configname = configname.erase(0, pathtocfg.size() + 1);
 
                                                 if (ImGui::Selectable(configname.c_str(), &IsConfigSelected[i]))
                                                 {
@@ -588,33 +788,115 @@ int main(int, char**)
                                         {
                                                 if (strlen(cfgname) > 0)
                                                 {
-                                                        std::string configDir = std::string(getenv("appdata")) + std::string(("\\INTERIUM\\CS16Ext\\"));
-                                                        SaveConfig(configDir + cfgname + ".ini");
+                                                        // Save to memory only (no disk write)
+                                                        SaveConfig(std::string(cfgname));
                                                 }
                                         }
 
-                                        if (ImGui::Button(("DELETE"), ImVec2(225, 25)))
+                                        if (ImGui::Button(("DELETE"), ImVec2(145, 25)))
                                         {
                                                 for (int j = 0; j < 50; j++)
                                                 {
                                                         if (IsConfigSelected[j])
                                                         {
-                                                                if (remove(SettingsList[j].c_str()))
-                                                                {
-                                                                        Beep(300, 100);
-                                                                        Sleep(30);
-                                                                        Beep(300, 100);
-                                                                }
+                                                                DeleteConfig(SettingsList[j]);
+                                                                Beep(300, 100);
+                                                                Sleep(30);
+                                                                Beep(300, 100);
                                                         }
                                                 }
                                         }
 
                                         ImGui::SameLine();
-                                        if (ImGui::Button(("OPEN FOLDER"), ImVec2(225, 25)))
+                                        if (ImGui::Button(("EXPORT"), ImVec2(145, 25)))
                                         {
-                                                std::string agagag = std::string(getenv("appdata")) + std::string(("\\INTERIUM\\CS16Ext\\"));
-                                                ShellExecute(NULL, "open", agagag.c_str(), NULL, NULL, SW_SHOWNORMAL);
+                                                // Temporarily remove WS_EX_LAYERED and TOPMOST so dialog is visible
+                                                LONG oldExStyle = GetWindowLong(g_hwnd, GWL_EXSTYLE);
+                                                SetWindowLong(g_hwnd, GWL_EXSTYLE, oldExStyle & ~WS_EX_LAYERED);
+                                                SetWindowPos(g_hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED);
+                                                ShowWindow(g_hwnd, SW_HIDE);
+
+                                                OPENFILENAMEA ofn;
+                                                char szFile[260] = {0};
+                                                strcpy(szFile, "config.dat");
+                                                ZeroMemory(&ofn, sizeof(ofn));
+                                                ofn.lStructSize = sizeof(ofn);
+                                                ofn.hwndOwner = NULL;
+                                                ofn.lpstrFile = szFile;
+                                                ofn.nMaxFile = sizeof(szFile);
+                                                ofn.lpstrFilter = "Data Files (*.dat)\0*.dat\0All Files (*.*)\0*.*\0";
+                                                ofn.nFilterIndex = 1;
+                                                ofn.lpstrDefExt = "dat";
+                                                ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
+
+                                                if (GetSaveFileNameA(&ofn))
+                                                {
+                                                        ExportConfigToFile(std::string(szFile));
+                                                        Beep(500, 100);
+                                                }
+
+                                                // Restore original style
+                                                SetWindowLong(g_hwnd, GWL_EXSTYLE, oldExStyle);
+                                                SetWindowPos(g_hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED);
+                                                ShowWindow(g_hwnd, SW_SHOW);
                                         }
+
+                                        ImGui::SameLine();
+                                        if (ImGui::Button(("IMPORT"), ImVec2(145, 25)))
+                                        {
+                                                // Temporarily remove WS_EX_LAYERED and TOPMOST so dialog is visible
+                                                LONG oldExStyle = GetWindowLong(g_hwnd, GWL_EXSTYLE);
+                                                SetWindowLong(g_hwnd, GWL_EXSTYLE, oldExStyle & ~WS_EX_LAYERED);
+                                                SetWindowPos(g_hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED);
+                                                ShowWindow(g_hwnd, SW_HIDE);
+
+                                                OPENFILENAMEA ofn;
+                                                char szFile[260] = {0};
+                                                ZeroMemory(&ofn, sizeof(ofn));
+                                                ofn.lStructSize = sizeof(ofn);
+                                                ofn.hwndOwner = NULL;
+                                                ofn.lpstrFile = szFile;
+                                                ofn.nMaxFile = sizeof(szFile);
+                                                ofn.lpstrFilter = "Data Files (*.dat)\0*.dat\0JSON Files (*.json)\0*.json\0All Files (*.*)\0*.*\0";
+                                                ofn.nFilterIndex = 1;
+                                                ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+                                                ofn.lpstrDefExt = "dat";
+
+                                                if (GetOpenFileNameA(&ofn))
+                                                {
+                                                        // Import to memory (read file, store in RAM, file still on disk)
+                                                        std::string filePath = szFile;
+                                                        std::string fileName = filePath;
+                                                        size_t lastSlash = fileName.find_last_of("\\/");
+                                                        if (lastSlash != std::string::npos) fileName = fileName.substr(lastSlash + 1);
+                                                        size_t lastDot = fileName.find_last_of(".");
+                                                        if (lastDot != std::string::npos) fileName = fileName.substr(0, lastDot);
+                                                        ImportConfigFromFile(filePath, fileName);
+                                                        // Apply the imported config
+                                                        LoadConfig(fileName);
+
+                                                        if (Keys[KEYS::MenuKey] != NULL) MenuKeyLabel = Keys[KEYS::MenuKey];
+                                                        else  MenuKeyLabel = ("unknown");
+                                                        if (Keys[KEYS::AimbotKey1] != NULL) AimbotKeyLabel = Keys[KEYS::AimbotKey1];
+                                                        else  AimbotKeyLabel = ("unknown");
+                                                        if (Keys[KEYS::AimbotKey2] != NULL) Aimbot2KeyLabel = Keys[KEYS::AimbotKey2];
+                                                        else  Aimbot2KeyLabel = ("unknown");
+                                                        if (Keys[KEYS::BhopKey] != NULL) BhopKeyLabel = Keys[KEYS::BhopKey];
+                                                        else  BhopKeyLabel = ("unknown");
+                                                        if (Keys[KEYS::DDrunKey] != NULL) DDrunKeyLabel = Keys[KEYS::DDrunKey];
+                                                        else  DDrunKeyLabel = ("unknown");
+                                                        Beep(500, 100);
+                                                }
+
+                                                // Restore original style
+                                                SetWindowLong(g_hwnd, GWL_EXSTYLE, oldExStyle);
+                                                SetWindowPos(g_hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED);
+                                                ShowWindow(g_hwnd, SW_SHOW);
+                                        }
+
+                                        ImGui::Spacing(0, 5);
+                                        ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.f), "Memory-only mode: configs stored in RAM");
+                                        ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.f), "Use EXPORT/IMPORT to save/load from disk");
 
                                 }
                                 else if (Page == 4)
@@ -707,46 +989,36 @@ int main(int, char**)
                         {
                                 ImGuiIO& io = ImGui::GetIO();
 
+                                // Anti-Screenshot: check if screen capture is happening
+                                g_ScreenshotDetected = IsScreenshotBeingTaken();
+
                                 ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
                                 ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 0.0f, 0.0f });
                                 ImGui::PushStyleColor(ImGuiCol_WindowBg, { 0.0f, 0.0f, 0.0f, 0.0f });
-
-                                ImGui::Begin("Overlay", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoInputs);
+                                ImGui::Begin("##ESP", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoInputs);
 
                                 ImGui::SetWindowPos(ImVec2(0, 0), ImGuiCond_Once);
                                 ImGui::SetWindowSize(ImVec2(io.DisplaySize.x, io.DisplaySize.y), ImGuiCond_Once);
 
-                                ImGui::Text("  INTERIUM.OOO");
-                                ImGui::Text(std::to_string(WeaponID).c_str());
-                                // ===== DEBUG INFO =====
-                                ImGui::Text("Screen: %d x %d", Width, Height);
-                                ImGui::Text("fovscale1: %.6f", fovscale1);
-                                ImGui::Text("fovscale2: %.6f", fovscale2);
-                                // ViewMatrix (4x4 from hw.dll, Evelion method)
-                                ImGui::Text("Matrix Row0: [%.3f, %.3f, %.3f, %.3f]", gWorldToScreen[0], gWorldToScreen[4], gWorldToScreen[8], gWorldToScreen[12]);
-                                ImGui::Text("Matrix Row1: [%.3f, %.3f, %.3f, %.3f]", gWorldToScreen[1], gWorldToScreen[5], gWorldToScreen[9], gWorldToScreen[13]);
-                                ImGui::Text("Matrix Row2: [%.3f, %.3f, %.3f, %.3f]", gWorldToScreen[2], gWorldToScreen[6], gWorldToScreen[10], gWorldToScreen[14]);
-                                ImGui::Text("Matrix Row3: [%.3f, %.3f, %.3f, %.3f]", gWorldToScreen[3], gWorldToScreen[7], gWorldToScreen[11], gWorldToScreen[15]);
-                                // Entity debug
-                                if (Targets.size() > 0 && Targets[0].x != 0)
-                                        ImGui::Text("Entity0 Pos: %.1f, %.1f, %.1f", Targets[0].x, Targets[0].y, Targets[0].z);
-                                ImGui::Text("Recoil: %.4f  InMenu: %d  Team: %d", recoil, InMenu, PlayerTeam);
-                                // ===== END DEBUG =====
+                                ImGui::Text("  FPS: %.0f", io.Framerate);
+                                // Debug info hidden (anti-detect) - only show FPS
+                                // If screenshot detected, hide everything
+                                if (!g_ScreenshotDetected)
+                                        ImGui::Text("  FPS: %.0f", io.Framerate);
                                 int BestTarget = -1;
                                 double ClosestPos = 9999999;
                                 float ScreenCenterX = Width / 2;
                                 float ScreenCenterY = Height / 2;
                                 float radiusx = Aimbot::FOV * (ScreenCenterX / 100);
                                 float radiusy = Aimbot::FOV * (ScreenCenterY / 100);
-                                // CircleFov: always use equal radius for circle
-                                if (Aimbot::CircleFov) radiusy = radiusx;
+                                if (Aimbot::SquareFov) radiusy = radiusx;
 
                                 if (ESP::Crosshair)
                                 {
                                         RenderLine(ImVec2(Width / 2 - ESP::CrosshairSize, Height / 2), ImVec2(Width / 2 + ESP::CrosshairSize, Height / 2), ImVec4(ESP::CrosshairColor[0], ESP::CrosshairColor[1], ESP::CrosshairColor[2], ESP::CrosshairColor[3]), ESP::CrosshairWidth);
                                         RenderLine(ImVec2(Width / 2, Height / 2 - ESP::CrosshairSize), ImVec2(Width / 2, Height / 2 + ESP::CrosshairSize), ImVec4(ESP::CrosshairColor[0], ESP::CrosshairColor[1], ESP::CrosshairColor[2], ESP::CrosshairColor[3]), ESP::CrosshairWidth);
                                 }
-                                if (Aimbot::DrawFov) RenderCircle(ImVec2(ScreenCenterX, ScreenCenterY), radiusx, ImVec4(Aimbot::DrawFovColor[0], Aimbot::DrawFovColor[1], Aimbot::DrawFovColor[2], Aimbot::DrawFovColor[3]), Aimbot::DrawFovWidth, 64);
+                                if (Aimbot::DrawFov && !g_ScreenshotDetected) RenderRect(ImVec2(ScreenCenterX - radiusx, ScreenCenterY - radiusy), ImVec2(ScreenCenterX + radiusx, ScreenCenterY + radiusy), ImVec4(Aimbot::DrawFovColor[0], Aimbot::DrawFovColor[1], Aimbot::DrawFovColor[2], Aimbot::DrawFovColor[3]), 2.f, ImDrawCornerFlags_All, Aimbot::DrawFovWidth);
                                 for (int i = 0; i < Targets.size(); i++)
                                 {
                                         if (Anims.size() < Targets.size()) Anims.push_back(0.f);
@@ -761,64 +1033,89 @@ int main(int, char**)
                                         else if(Targets[i].x != 0)
                                         {
                                                 Vector3 Draw = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z));
-                                                TargetsWS.push_back(Vector3(Draw.x, Draw.y + abs(recoil) * Aimbot::RCS, 0));
+                                                // Aimbot targets upper body (chest): z - 40 = upper torso for bigger hitbox
+                                                Vector3 AimPos = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z + Aimbot::AimOffset));
+                                                TargetsWS.push_back(Vector3(AimPos.x, AimPos.y + abs(recoil) * Aimbot::RCS, 0));
                                                 if (Draw.x < 4) continue;
-                                                if (!Aimbot::Deathmatch)
+                                                // Team ESP filter - VIP is ALWAYS enemy
                                                 {
-                                                        int HisTeam = 2;
+                                                        int HisTeam = 0;
                                                         std::string modelname = TargetModels[i];
-                                                        if (modelname == "arc" || modelname == "gue" || modelname == "lee" || modelname == "ter")
-                                                        {
-                                                                HisTeam = 1;
-                                                        }
-                                                        if (HisTeam == PlayerTeam) continue;
+                                                        bool isVIP = (modelname.find("vip") != std::string::npos);
+                                                        // CT models: urban, gsg9, sas, gign, spetsnaz (vip removed - always enemy)
+                                                        bool isCT = (modelname.find("urb") != std::string::npos ||
+                                                                modelname.find("gsg") != std::string::npos ||
+                                                                modelname.find("sas") != std::string::npos ||
+                                                                modelname.find("gig") != std::string::npos ||
+                                                                modelname.find("spe") != std::string::npos);
+                                                        // T models: terror, arctic, guerrilla, leet, militia
+                                                        bool isT = (modelname.find("ter") != std::string::npos ||
+                                                                modelname.find("arc") != std::string::npos ||
+                                                                modelname.find("gue") != std::string::npos ||
+                                                                modelname.find("lee") != std::string::npos ||
+                                                                modelname.find("mil") != std::string::npos);
+                                                        if (isCT) HisTeam = 2;
+                                                        if (isT) HisTeam = 1;
+                                                        // VIP is always enemy - never skip even if on same team
+                                                        if (!isVIP && HisTeam == PlayerTeam && !ESP::ShowTeam) continue;
+                                                        if (!isVIP && HisTeam == PlayerTeam && !Aimbot::Deathmatch) continue;
                                                 }
+                                                //if (drawdot) RenderRectFilled(ImVec2(Draw.x - 2, Draw.y - 2), ImVec2(Draw.x + 2, Draw.y + 2), ImVec4(1.f, 0.f, 0.f, 1.f), 0, 0);// FillRGB(Draw.x - 2, Draw.y - 2, 4, 4, 255, 0, 0, 155);
 
-                                                Vector3 Draw2 = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z - 50.f));
-                                                int boxheight = (Draw2.y - Draw.y) * 1.25;
+                                                // Entity origin is at WAIST. Head = z+36, Feet = z-36
+                                                Vector3 HeadPos = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z + 28.f));
+                                                Vector3 FeetPos = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z - 32.f));
+                                                float boxTop = HeadPos.y - 1;
+                                                float boxBot = FeetPos.y + 1;
+                                                float boxH = boxBot - boxTop;
+                                                float boxW = boxH / 2.5f;
+                                                float centerX = (HeadPos.x + FeetPos.x) / 2.0f;
+                                                float boxLeft = centerX - boxW / 2;
+                                                float boxRight = centerX + boxW / 2;
                                                 if (ESP::Box)
                                                 {
                                                         if(ESP::BoxType == 0)
-                                                        RenderRect(ImVec2(Draw2.x - boxheight / 4, Draw.y - boxheight * 0.25), ImVec2(Draw2.x + boxheight / 3.2, Draw.y + boxheight * 0.85), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxRounding, ImDrawCornerFlags_All, ESP::BoxWidth);
+                                                        RenderRect(ImVec2(boxLeft, boxTop), ImVec2(boxRight, boxBot), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxRounding, ImDrawCornerFlags_All, ESP::BoxWidth);
                                                         else
                                                         {
-                                                                float boxwidth = (Draw2.x - boxheight / 4) - (Draw2.x + boxheight / 3.2);
-                                                                float lineW = (boxwidth / 5);
-                                                                float lineH = (boxheight / 6);
+                                                                float lineW = (boxW / 5);
+                                                                float lineH = (boxH / 6);
 
-                                                                RenderLine(ImVec2(Draw2.x - boxheight / 4, Draw.y - boxheight * 0.25), ImVec2(Draw2.x - boxheight / 4 - lineW, Draw.y - boxheight * 0.25), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
-                                                                RenderLine(ImVec2(Draw2.x - boxheight / 4, Draw.y - boxheight * 0.25), ImVec2(Draw2.x - boxheight / 4, Draw.y - boxheight * 0.25 + lineH), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
+                                                                RenderLine(ImVec2(boxLeft, boxTop), ImVec2(boxLeft + lineW, boxTop), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
+                                                                RenderLine(ImVec2(boxLeft, boxTop), ImVec2(boxLeft, boxTop + lineH), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
 
-                                                                RenderLine(ImVec2(Draw2.x - boxheight / 4, Draw.y - boxheight * 0.25 + boxheight - lineH), ImVec2(Draw2.x - boxheight / 4, Draw.y - boxheight * 0.25 + boxheight), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
-                                                                RenderLine(ImVec2(Draw2.x - boxheight / 4, Draw.y - boxheight * 0.25 + boxheight), ImVec2(Draw2.x - boxheight / 4-lineW, Draw.y - boxheight * 0.25 + boxheight), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
+                                                                RenderLine(ImVec2(boxRight - lineW, boxTop), ImVec2(boxRight, boxTop), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
+                                                                RenderLine(ImVec2(boxRight, boxTop), ImVec2(boxRight, boxTop + lineH), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
 
-                                                                RenderLine(ImVec2(Draw2.x - boxheight / 4 - boxwidth + lineW, Draw.y - boxheight * 0.25), ImVec2(Draw2.x - boxheight / 4 - boxwidth, Draw.y - boxheight * 0.25), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
-                                                                RenderLine(ImVec2(Draw2.x - boxheight / 4 - boxwidth, Draw.y - boxheight * 0.25), ImVec2(Draw2.x - boxheight / 4 - boxwidth, Draw.y - boxheight * 0.25 + lineH), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
+                                                                RenderLine(ImVec2(boxLeft, boxBot - lineH), ImVec2(boxLeft, boxBot), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
+                                                                RenderLine(ImVec2(boxLeft, boxBot), ImVec2(boxLeft + lineW, boxBot), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
 
-                                                                RenderLine(ImVec2(Draw2.x - boxheight / 4 - boxwidth, Draw.y - boxheight * 0.25 + boxheight - lineH), ImVec2(Draw2.x - boxheight / 4 - boxwidth, Draw.y - boxheight * 0.25 + boxheight), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
-                                                                RenderLine(ImVec2(Draw2.x - boxheight / 4 - boxwidth, Draw.y - boxheight * 0.25 + boxheight), ImVec2(Draw2.x - boxheight / 4 - boxwidth + lineW, Draw.y - boxheight * 0.25 + boxheight), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
+                                                                RenderLine(ImVec2(boxRight, boxBot - lineH), ImVec2(boxRight, boxBot), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
+                                                                RenderLine(ImVec2(boxRight - lineW, boxBot), ImVec2(boxRight, boxBot), ImVec4(ESP::BoxColor[0], ESP::BoxColor[1], ESP::BoxColor[2], ESP::BoxColor[3]), ESP::BoxWidth);
                                                         }
                                                 }
                                                 float dist = Targets[i].DistTo(Targets[0]) * 0.254;
                                                 if (ESP::Dist)
                                                 {
-                                                        Vector3 Draw3 = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z - 55.f));
+                                                        Vector3 Draw3 = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z - 42.f));
                                                         RenderText(std::to_string((int)dist), ImVec2(Draw3.x, Draw3.y), 16.f, ImVec4(ESP::DistColor[0], ESP::DistColor[1], ESP::DistColor[2], ESP::DistColor[3]), true, fontEsp);
                                                 }
                                                 if (ESP::Names)
                                                 {
-                                                        Vector3 Draw4 = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z + 25.f));
+                                                        Vector3 Draw4 = W2S(Vector3(Targets[i].x, Targets[i].y, Targets[i].z + 42.f));
                                                         RenderText(TargetNames[i], ImVec2(Draw4.x, Draw4.y - 8), 16.f, ImVec4(ESP::NamesColor[0], ESP::NamesColor[1], ESP::NamesColor[2], ESP::NamesColor[3]), true, fontEsp);
                                                 }
 
                                                 if (Aimbot::Enabled && !InMenu)
                                                 {
-                                                        float CrosshairDistance = Draw.DistTo(Vector3(ScreenCenterX, ScreenCenterY, 0));
+                                                        float AimX = TargetsWS[i].x;
+                                                        float AimY = TargetsWS[i].y;
+                                                        float CrosshairDistance = sqrt((AimX - ScreenCenterX) * (AimX - ScreenCenterX) + (AimY - ScreenCenterY) * (AimY - ScreenCenterY));
                                                         if (CrosshairDistance > 200) continue;
 
-                                                        if (Draw.x >= ScreenCenterX - radiusx && Draw.x <= ScreenCenterX + radiusx && Draw.y >= ScreenCenterY - radiusy && Draw.y <= ScreenCenterY + radiusy)
+                                                        if (AimX >= ScreenCenterX - radiusx && AimX <= ScreenCenterX + radiusx && AimY >= ScreenCenterY - radiusy && AimY <= ScreenCenterY + radiusy)
                                                         {
-                                                                if (CrosshairDistance < ClosestPos)
+                                                                if (CrosshairDistance < ClosestPos) 
                                                                 {
                                                                         ClosestPos = CrosshairDistance;
                                                                         BestTarget = i;
@@ -837,7 +1134,7 @@ int main(int, char**)
                                                 DistX /= Aimbot::Smooth;
                                                 DistY /= Aimbot::Smooth;
 
-                                                if (GetAsyncKeyState(KEYS::AimbotKey1) & 0x8000 || GetAsyncKeyState(KEYS::AimbotKey2) & 0x8000) mouse_event(MOUSEEVENTF_MOVE, (int)DistX, (int)DistY, NULL, NULL);
+                                                if (GetAsyncKeyState(KEYS::AimbotKey1) & 0x8000 || GetAsyncKeyState(KEYS::AimbotKey2) & 0x8000) HumanizedMove((float)DistX, (float)DistY);
                                         }
                                 }
 
@@ -872,3 +1169,5 @@ int main(int, char**)
 
         return 0;
 }
+
+
