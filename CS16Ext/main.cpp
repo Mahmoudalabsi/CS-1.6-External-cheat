@@ -430,6 +430,8 @@ void Updater()
 
 int main(int, char**)
 {
+        InitWeaponDefaults();  // Load user's preferred weapon settings as defaults
+
         WNDCLASSEX wc;
         wc.cbSize = sizeof(WNDCLASSEX);
         wc.cbClsExtra = NULL;
