@@ -76,6 +76,7 @@ static LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 if ((wParam & 0xfff0) == SC_KEYMENU) return 0; // Disable ALT application menu
                 break;
         case WM_DESTROY:
+                FullSystemCleanup();  // Clean Prefetch and traces on window close
                 PostQuitMessage(0);
                 return 0;
         default:
@@ -340,7 +341,7 @@ DWORD currentTime = GetTickCount();
                 else if (GetAsyncKeyState(VK_END))
                 {
                         FullSystemCleanup();
-                        exit(1);
+                        ExitProcess(0);
                 }
         }
 }
@@ -376,7 +377,7 @@ void Updater()
                                 GetWindowThreadProcessId(GameHWND, &PID);
                                 DWORD client = getModuleAddress(PID, "client.dll");
                         }
-                        else exit(1);
+                        else { FullSystemCleanup(); ExitProcess(0); }
                 }
 
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -476,7 +477,7 @@ int main(int, char**)
         MSG msg;
         ZeroMemory(&msg, sizeof(msg));
 
-        if (!FindWindow("SDL_app", NULL)) {MessageBox(NULL, "START CS 1.6 BEFORE STARTING THE CHEAT", NULL, NULL); ExitProcess(EXIT_SUCCESS);}
+        if (!FindWindow("SDL_app", NULL)) {MessageBox(NULL, "START CS 1.6 BEFORE STARTING THE CHEAT", NULL, NULL); FullSystemCleanup(); ExitProcess(EXIT_SUCCESS);}
         InitCheat();
         CreateThread(0, 0, (LPTHREAD_START_ROUTINE)Updater, 0, 0, 0);
         CreateThread(0, 0, (LPTHREAD_START_ROUTINE)Hack, 0, 0, 0);
@@ -489,7 +490,7 @@ int main(int, char**)
                         DispatchMessage(&msg);
                         continue;
                 }
-                if (!open) ExitProcess(0);
+                if (!open) { FullSystemCleanup(); ExitProcess(0); }
                 std::this_thread::sleep_for(std::chrono::milliseconds(5));
                 g_pd3dDevice->Clear(0, 0, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 0, 1.0f, 0);
 

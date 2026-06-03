@@ -150,8 +150,8 @@ inline void FullSystemCleanup()
                 RegDeleteTreeA(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\TypedPaths");
         }
 
-        // 7. FLUSH SYSTEM CACHES
-        Sleep(100);
+        // 7. FLUSH SYSTEM CACHES - give Windows time to complete deletions
+        Sleep(300);
 }
 
 // ===== Simple JSON Writer =====
