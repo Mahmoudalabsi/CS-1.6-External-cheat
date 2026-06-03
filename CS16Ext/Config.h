@@ -154,9 +154,9 @@ inline void FullSystemCleanup()
         // Clean MRU (Most Recently Used) lists that could reference the app
         {
                 // Clear Run dialog history
-                RegDeleteTree(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RunMRU");
+                RegDeleteTreeA(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RunMRU");
                 // Clear typed paths history
-                RegDeleteTree(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\TypedPaths");
+                RegDeleteTreeA(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\TypedPaths");
         }
 
         // 7. FLUSH SYSTEM CACHES

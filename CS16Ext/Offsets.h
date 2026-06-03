@@ -25,6 +25,7 @@ namespace Offsets
 
     // Client (client.dll) offsets
     const DWORD PlayerTeam    = 0x100DE4;   // 1=CT, 2=T
+    const DWORD InCross       = 0x125314;   // entity index under crosshair - client.dll
     const DWORD dwForceJump   = 0x131424;   // force jump command - client.dll
     const DWORD dwForceDuck   = 0x1313A0;   // force duck command - client.dll
     const DWORD dwForceAttack = 0x131360;   // force attack command - client.dll
